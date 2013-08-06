@@ -1,4 +1,4 @@
-$MaxThreads = 10
+$MaxThreads = 1
 $SleepTimer = 500
 
 $RunCommand = "C:\Users\epierce.FOREST\Documents\GitHub\MessageServiceWorker-Posh\Scripts\ProvisionAccounts.ps1"
@@ -24,7 +24,6 @@ for($counter = 1; $counter -le $MaxThreads; $counter++){
 }
 
 Get-Job | Wait-Job
-
 
     ForEach($Job in Get-Job){
         "$($Job.Name)"

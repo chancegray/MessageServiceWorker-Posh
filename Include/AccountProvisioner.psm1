@@ -239,16 +239,12 @@ function Get-UserDetails {
 }
 
 function Get-UserExists {
-    [CmdletBinding()]
     param(
-        [Parameter(
-			Position=0, 
-			Mandatory=$true,
-			ValueFromPipeline = $true)]
-        [System.String]$UserPrincipalName
+        [Parameter(Mandatory=$true)] [System.String]$UserPrincipalName,
+		[Parameter(Mandatory=$true)] [System.String]$SearchRoot
     )
 
-	$count = Get-QADUser -DontUseDefaultIncludedProperties -Identity $UserPrincipalName -SizeLimit 0 | Measure-Object | Select-Object -expand count
+	$count = Get-QADUser -DontUseDefaultIncludedProperties -Identity $UserPrincipalName -SearchRoot $SearchRoot | Measure-Object | Select-Object -expand count
 	
 	if ($count -gt 0){
 		return $true

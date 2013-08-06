@@ -122,33 +122,33 @@ function Resolve-DefaultContainer {
 		#Check based on ePPA
 		switch -regex ($PrimaryAffiliation) {
 			"Student" {
-				$ParentContainer = "OU=Student,$BaseDN"
+				$ParentContainer = $("OU=Accounts,OU=Students,"+$BaseDN)
 				break
 			}
 			"(Faculty|Staff)" {		
 				#USF Health accounts go in their own OU
 				if($AttributesFromJSON.USFeduCollege -and $AttributesFromJSON.USFeduCollege[0] -match "(Medicine|Public Health|Nursing|Pharmacy)"){
-					$ParentContainer = "OU=USF Health,$BaseDN"
+					$ParentContainer = $("OU=USF Health,"+$BaseDN)
 				#So do USFSP
 				} elseif ($AttributesFromJSON.USFeduCampus -and $AttributesFromJSON.USFeduCampus[0] -eq "StPete") {
-					$ParentContainer = "OU=USF StPete,$BaseDN"
+					$ParentContainer = $("OU=USF StPete,"+$BaseDN)
 				#Everyone else goes in NewAccounts
 				} else {
-					$ParentContainer = "OU=NewAccounts,$BaseDN"
+					$ParentContainer = $("OU=NewAccounts,"+$BaseDN)
 				}
 				break
 			}
 			"Affiliate" {
-				$ParentContainer = "OU=Affiliate,$BaseDN"
+				$ParentContainer = $("OU=VIP,OU=NewAccounts,"+$BaseDN)
 				break
 			}
 			default {
-				$ParentContainer = "OU=NoAffiliation,$BaseDN"
+				$ParentContainer = $("OU=No Affiliation,"+$BaseDN)
 				break
 			}
 		}
 	} else {
-		$ParentContainer = "OU=NoAffiliation,$BaseDN"
+		$ParentContainer = $("OU=No Affiliation,"+$BaseDN)
 	}
 	
 	#Override the default if we're passed a special value
@@ -159,6 +159,26 @@ function Resolve-DefaultContainer {
 	return $ParentContainer
 }
 
+function Confirm-ManagedContainer {
+	param(
+        [Parameter(Position=0, Mandatory=$true,ValueFromPipeline = $true)] $Container
+    )
+	
+		#List of managed OUs
+		$ManagedContainers = @(
+			$("OU=No Affiliation,"+$BaseDN),
+			$("OU=NewAccounts,"+$BaseDN),
+			$("OU=VIP,OU=NewAccounts,"+$BaseDN),
+			$("OU=NewAccounts,"+$BaseDN),
+			$("OU=USF StPete,"+$BaseDN),
+			$("OU=USF Health,"+$BaseDN),
+			$("OU=Accounts,OU=Students,"+$BaseDN),
+			$("OU=Disabled,OU=Students,"+$BaseDN)
+		)
 
+		return $ManagedContainers -contains $Container
+}
+
+Export-ModuleMember -Function Confirm-ManagedContainer
 Export-ModuleMember -Function ConvertTo-AttributeHash
 Export-ModuleMember -Function Resolve-DefaultContainer
