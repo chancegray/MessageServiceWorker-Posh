@@ -347,11 +347,54 @@ function Move-Account {
 	Move-QADObject -Identity $UserPrincipalName -NewParentContainer $Container
 }
 
+function Get-CurrentCimsGroupList {
+	[CmdletBinding()]
+	param(
+        [Parameter(Mandatory=$true)] [System.String]$UserPrincipalName
+    )
+	
+	$GroupDNlist = Get-QADUser -Identity $UserPrincipalName | Select-Object "memberOf"
+	$array = [regex]::matches($GroupDNlist.MemberOf, "CN=(CIMS.*?),.*?") | % {$_.Result('$1')}
+	return $array
+}
+
+function Confirm-NonActiveMember {
+	[CmdletBinding()]
+	param(
+        [Parameter(Mandatory=$true)] [System.String]$UserPrincipalName
+    )
+	
+	$list = (Get-QADUser -Identity $UserPrincipalName).memberOf 
+	$list -contains "CN=Non-Active Users,CN=Users,DC=forest,DC=usf,DC=edu"
+}
+
+function Add-NonActiveMember {
+	[CmdletBinding()]
+	param(
+        [Parameter(Mandatory=$true)] [System.String]$UserPrincipalName
+    )
+	
+	Add-QADMemberOf -Identity $UserPrincipalName -Group "CN=Non-Active Users,CN=Users,DC=forest,DC=usf,DC=edu"
+}
+
+function Remove-NonActiveMember {
+	[CmdletBinding()]
+	param(
+        [Parameter(Mandatory=$true)] [System.String]$UserPrincipalName
+    )
+	
+	Remove-QADMemberOf -Identity $UserPrincipalName -Group "CN=Non-Active Users,CN=Users,DC=forest,DC=usf,DC=edu"
+}
+
 Export-ModuleMember -Function Get-UserDetails
 Export-ModuleMember -Function Get-UserExists
 Export-ModuleMember -Function New-Account
 Export-ModuleMember -Function Set-Account
 Export-ModuleMember -Function Move-Account
+Export-ModuleMember -Function Get-CurrentCimsGroupList
+Export-ModuleMember -Function Confirm-NonActiveMember
+Export-ModuleMember -Function Add-NonActiveMember
+Export-ModuleMember -Function Remove-NonActiveMember
 Export-ModuleMember -Function Get-AttributesToModify
 Export-ModuleMember -Function Write-LogEntry
 

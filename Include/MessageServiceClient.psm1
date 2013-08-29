@@ -113,7 +113,14 @@ function Get-QueueMessage($Credentials, [string] $Queue, [bool] $Verbose)
 		if ($Verbose) {
 			Display-Message $result.messages[0]
 		}
-		return $result.messages[0]
+		if ( $result.messages  -is [System.Array]){
+			return $result.messages[0]
+		} else {
+			$jsonResult = ConvertFrom-Json -InputObject $result
+			$jsonResult.gettype() | Write-Host
+			$jsonResult | Write-Host
+			return
+		}	
 	} catch [System.Net.WebException] {
 		if ($Verbose) {
 			Write-Warning "Failed reading from queue $Queue."

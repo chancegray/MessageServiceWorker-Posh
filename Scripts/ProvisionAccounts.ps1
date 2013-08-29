@@ -1,3 +1,4 @@
+[string]$LogFile = $input
 $ScriptPath = "C:\Users\epierce.FOREST\Documents\GitHub\MessageServiceWorker-Posh"
 
 Import-Module $ScriptPath\Include\MessageServiceClient.psm1 -Force
@@ -6,6 +7,8 @@ Import-Module $ScriptPath\Include\AccountProvisioner.psm1 -Force
 Import-Module $ScriptPath\Include\USFProvisionWorker.psm1 -Force
 
 $config = Import-INI "C:\Users\epierce.FOREST\Documents\GitHub\MessageServiceWorker-Posh\Config\ProvisionAccounts.ini"
+
+$StopWatch = [Diagnostics.Stopwatch]::StartNew()
 
 #Set up the credentials we're going to use
 $Password = Get-Content $config["MessageService"]["CredentialFile"] | ConvertTo-SecureString 
@@ -28,13 +31,16 @@ if ($config["ActiveDirectory"]["Verbose"] -eq "true"){
 	$Verbose = $false
 }
 
-
 $Connection = Connect-QADService -service $Domain -Credential $WindowsCredential
-
 
 if ($Verbose){
 	Write-Host "Retreiving" $MaxMessages "messages"
 }
+
+$TotalMessages = 0
+$Created = 0
+$Moved = 0
+$Enabled = 0
 
 for($counter = 1; $counter -le $MaxMessages; $counter++){
 
@@ -42,6 +48,9 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 	$Message = Get-QueueMessage -Credentials $MessageServiceCredential -Queue $QueueName -Verbose $Verbose
 	
 	if ($Message) {
+		
+		$TotalMessages++
+		
 		#Message contains one or more NetIDs
 		if($Message.messageData.attributes.uid -is [System.Array]){
 			$AccountExists = $false
@@ -69,6 +78,7 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 							if ($Verbose){ Write-Host "Account" $UserPrincipalName "found" }
 							$AccountExists = $true
 							$ChangeType = "rename"
+							"Looking for $Message.messageData.attributes.uid[0], found previous Netid: $Username" | Out-File $LogFile -Append -Force
 							break
 						}
 					}
@@ -95,9 +105,6 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 				}
 			}
 			
-			"--"
-			$UserPrincipalName		
-			
 			#Create an account if needed
 			if($ChangeType -eq "create"){
 				#create			
@@ -105,8 +112,9 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 				if ($Verbose) { "Creating account in $ParentContainer" }
 				$GivenName = $Message.messageData.attributes.givenName[0]
 				$FamilyName = $Message.messageData.attributes.sn[0]
-				"New-Account -Username $Username -ParentContainer $ParentContainer -GivenName $GivenName -FamilyName $FamilyName -Domain $UpnDomain"
+				(Get-Date -Format s)+"|Creating account for "+$UserPrincipalName+" in "+$ParentContainer | Out-File $LogFile -Append -Force
 				New-Account -Username $Username -ParentContainer $ParentContainer -GivenName $GivenName -FamilyName $FamilyName -Domain $UpnDomain | Out-Null
+				$Created++
 			}
 
 			#Get a HashMap of attributes
@@ -118,27 +126,57 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 			#Update Account
 			if ($Verbose) { Write-Host "Updating $UserPrincipalName" }
 			try {
-			
+				$CurrentAccount = Get-QADUser -UserPrincipalName $UserPrincipalName
+				
+				#Make sure the account is enabled
+				if( $CurrentAccount.AccountIsDisabled ){
+					(Get-Date -Format s)+"|"+$UserPrincipalName+" unlocked" | Out-File $LogFile -Append -Force
+					Enable-QADUser -Identity $UserPrincipalName | Out-Null
+					$Enabled++
+				}
+				
 				#Is this account in a managed OU?
-				$CurrentParentContainer = (Get-QADUser -UserPrincipalName $UserPrincipalName).ParentContainerDN.ToString()
+				$CurrentParentContainer = $CurrentAccount.ParentContainerDN.ToString()
 				$InManagedContainer = Confirm-ManagedContainer -Container $CurrentParentContainer
 
-				$CurrentParentContainer
 				if($InManagedContainer){
 					#Get correct account location
 					$DefaultParentContainer = Resolve-DefaultContainer -AttributesFromJSON $Message.messageData.attributes -BaseDN $BaseDN
 					
 					if( $DefaultParentContainer -ne $CurrentParentContainer ) {
-						$UserPrincipalName+" is in "+$CurrentParentContainer+".  It should be in "+$DefaultParentContainer | Write-Host
+						# Output info
+						(Get-Date -Format s)+"|"+$UserPrincipalName+" is in "+$CurrentParentContainer+".  Moving it to "+$DefaultParentContainer | Out-File $LogFile -Append -Force
 						Move-Account -UserPrincipalName $UserPrincipalName -Container $DefaultParentContainer | Out-Null
+						$Moved++
 					}
 				}
 				
+				#Should the account be in the 'No Access' group?
+				$NonActiveMember = Confirm-NonActiveMember -UserPrincipalName $UserPrincipalName
+				if( $DefaultParentContainer -eq $("OU=No Affiliation,"+$BaseDN) ) {
+					if (! $NonActiveMember -and $InManagedContainer){
+						Add-NonActiveMember -UserPrincipalName $UserPrincipalName | Out-Null
+						(Get-Date -Format s)+"|"+$UserPrincipalName+" added to Non-Active Group" | Out-File $LogFile -Append -Force
+					}
+				} else {
+					if ($NonActiveMember){
+						Remove-NonActiveMember -UserPrincipalName $UserPrincipalName | Out-Null
+						(Get-Date -Format s)+"|"+$UserPrincipalName+" removed from Non-Active Group" | Out-File $LogFile -Append -Force
+					}
+				}
+			
 				Set-Account -UserPrincipalName $UserPrincipalName -Attributes $AttrList | Out-Null
+				# Output info
+				$now = Get-Date -Format s
+				$now+"|"+$UserPrincipalName+" updated"
+				$now+"|"+$UserPrincipalName+" updated" | Out-File $LogFile -Append -Force
+				
+				#Remove message
 				Remove-QueueMessage -Credentials $MessageServiceCredential -Queue $QueueName -Id $Message.id -Verbose $Verbose
 			} catch [system.exception] {
 				if ($Verbose) { Write-Host $Error[0].Exception }
-				Write-LogEntry 1 Error "ProvisionWorker: $Error[0].Exception"
+				$Error[0].Exception | Out-File $LogFile -Append -Force
+				#Write-LogEntry 1 Error "ProvisionWorker: $Error[0].Exception"
 			}
 			
 			Remove-Variable ChangeType
@@ -153,3 +191,12 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 		break
 	}
 }
+
+$StopWatch.Stop()
+$elapsed = $StopWatch.Elapsed.toString()
+
+Add-Content $LogFile "Created: $Created"
+Add-Content $LogFile "Moved: $Moved"
+Add-Content $LogFile "Enabled: $Enabled"
+Add-Content $LogFile "Total messages read: $TotalMessages"
+Add-Content $LogFile "Elapsed time: $elapsed"

@@ -72,12 +72,6 @@ function ConvertTo-AttributeHash {
 	}
 	
 	#Fix specific attributes that differ between LDAP and AD
-	
-	#if($AttributesFromJSON.givenName -is [System.Array] -and $AttributesFromJSON.givenName.length -gt 1){
-	#	$NewAttributes.givenName = $AttributesFromJSON.givenName[0]
-	#	$NewAttributes.middleName = $AttributesFromJSON.givenName[1]
-	#}
-	
 	if($AttributesFromJSON.USFeduPrimaryAffiliation -eq 'N/A'){
 		$NewAttributes.USFeduPrimaryAffiliation = 'DELETE_ATTRIBUTE';
 	}
@@ -131,7 +125,7 @@ function Resolve-DefaultContainer {
 					$ParentContainer = $("OU=USF Health,"+$BaseDN)
 				#So do USFSP
 				} elseif ($AttributesFromJSON.USFeduCampus -and $AttributesFromJSON.USFeduCampus[0] -eq "StPete") {
-					$ParentContainer = $("OU=USF StPete,"+$BaseDN)
+					$ParentContainer = $("OU=USF St Pete,"+$BaseDN)
 				#Everyone else goes in NewAccounts
 				} else {
 					$ParentContainer = $("OU=NewAccounts,"+$BaseDN)
