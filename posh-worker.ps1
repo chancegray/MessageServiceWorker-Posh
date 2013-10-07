@@ -19,7 +19,7 @@ $InitBlock = {
 }
 
 "Starting at " + (Get-Date -Format s)  | Out-File $LogFileName -Append -Force
-"MaxThreads: " + $MaxThreads | Out-File $LogFile -Append -Force
+"MaxThreads: " + $MaxThreads | Out-File $LogFileName -Append -Force
 "Sleep between starting threads: " + $SleepTimer + " Milliseconds" | Out-File $LogFileName -Append -Force
 "#########################################" | Out-File $LogFileName -Append -Force
 

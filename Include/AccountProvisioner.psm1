@@ -334,7 +334,7 @@ function Set-Account {
 	}
 	$num = $Attributes.Keys | Measure-Object | Select-Object -expand count
 	Write-LogEntry 1 Information "Set-Account: Updating $num attributes on $UserPrincipalName"
-	Set-QADUser -Identity $UserPrincipalName -ObjectAttributes $Attributes
+	Set-QADUser -Identity $UserPrincipalName -ObjectAttributes $Attributes | Out-Null
 }
 
 function Move-Account {
