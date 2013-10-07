@@ -55,7 +55,11 @@ function ConvertTo-AttributeHash {
 		'USFeduPrimaryCollege' = 'DELETE_ATTRIBUTE';
 		'USFeduPrimaryDepartment' = 'DELETE_ATTRIBUTE';
 		'extensionAttribute1' = 'DELETE_ATTRIBUTE';
-		'extensionAttribute11' = 'DELETE_ATTRIBUTE';		
+		'extensionAttribute11' = 'DELETE_ATTRIBUTE';
+		'USFeduPrimaryEmail' = 'DELETE_ATTRIBUTE';
+		'USFeduOfficialGivenname' = 'DELETE_ATTRIBUTE';
+		'USFeduOfficialMiddlename' = 'DELETE_ATTRIBUTE';
+		'USFeduOfficialSurname' = 'DELETE_ATTRIBUTE';
 	}
 	
 	$NewAttributes = @{}
@@ -111,6 +115,7 @@ function Resolve-DefaultContainer {
     )
 	
 	$PrimaryAffiliation = $AttributesFromJSON.eduPersonPrimaryAffiliation
+	$UsfPrimaryAffiliation = $AttributesFromJSON.USFeduPrimaryAffiliation
 	
 	if ($PrimaryAffiliation){
 		#Check based on ePPA
@@ -142,7 +147,12 @@ function Resolve-DefaultContainer {
 			}
 		}
 	} else {
-		$ParentContainer = $("OU=No Affiliation,"+$BaseDN)
+		#Some VIP groups don't give an ePPA, so we have to go by USFPA
+		if ($UsfPrimaryAffiliation -eq "VIP"){
+			$ParentContainer = $("OU=VIP,OU=NewAccounts,"+$BaseDN)
+		} else {
+			$ParentContainer = $("OU=No Affiliation,"+$BaseDN)
+		}
 	}
 	
 	#Override the default if we're passed a special value

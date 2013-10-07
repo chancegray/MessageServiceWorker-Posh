@@ -126,20 +126,22 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 			#Update Account
 			if ($Verbose) { Write-Host "Updating $UserPrincipalName" }
 			try {
-				$CurrentAccount = Get-QADUser -UserPrincipalName $UserPrincipalName
-				
-				#Make sure the account is enabled
-				if( $CurrentAccount.AccountIsDisabled ){
-					(Get-Date -Format s)+"|"+$UserPrincipalName+" unlocked" | Out-File $LogFile -Append -Force
-					Enable-QADUser -Identity $UserPrincipalName | Out-Null
-					$Enabled++
-				}
+				$CurrentAccount = Get-QADUser -UserPrincipalName $UserPrincipalName -IncludedProperties userAccountControl
 				
 				#Is this account in a managed OU?
 				$CurrentParentContainer = $CurrentAccount.ParentContainerDN.ToString()
 				$InManagedContainer = Confirm-ManagedContainer -Container $CurrentParentContainer
 
 				if($InManagedContainer){
+				
+					#Make sure the account is enabled and doesn't have any special uAC flags
+					if( $CurrentAccount.userAccountControl -ne '512' ){
+						Set-QADUser -Identity $UserPrincipalName -ObjectAttributes @{userAccountControl=512} | Out-Null
+						(Get-Date -Format s)+"|"+$UserPrincipalName+" uAC updated" | Out-File $LogFile -Append -Force
+						$Enabled++
+					}
+					
+				
 					#Get correct account location
 					$DefaultParentContainer = Resolve-DefaultContainer -AttributesFromJSON $Message.messageData.attributes -BaseDN $BaseDN
 					
@@ -167,9 +169,7 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 			
 				Set-Account -UserPrincipalName $UserPrincipalName -Attributes $AttrList | Out-Null
 				# Output info
-				$now = Get-Date -Format s
-				$now+"|"+$UserPrincipalName+" updated"
-				$now+"|"+$UserPrincipalName+" updated" | Out-File $LogFile -Append -Force
+				(Get-Date -Format s)+"|"+$UserPrincipalName+" updated" | Out-File $LogFile -Append -Force
 				
 				#Remove message
 				Remove-QueueMessage -Credentials $MessageServiceCredential -Queue $QueueName -Id $Message.id -Verbose $Verbose
