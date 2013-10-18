@@ -1,10 +1,10 @@
 $MaxThreads = 10
 $SleepTimer = 50
-$LogDir = "C:\Users\epierce.FOREST\Documents\GitHub\MessageServiceWorker-Posh\Logs"
+$LogDir = "C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh\Logs"
 $LogFileName = $LogDir+"\provision-"+(Get-Date -Format yyyyMMddHHmss)+".log"
 
-$RunCommand = "C:\Users\epierce.FOREST\Documents\GitHub\MessageServiceWorker-Posh\Scripts\ProvisionAccounts.ps1"
-$RunCommandINI = "C:\Users\epierce.FOREST\Documents\GitHub\MessageServiceWorker-Posh\Config\ProvisionAccounts.ini"
+$RunCommand = "C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh\Scripts\ProvisionAccounts.ps1"
+$RunCommandINI = "C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh\Config\ProvisionAccounts.ini"
 
 $StopWatch = [Diagnostics.Stopwatch]::StartNew()
 

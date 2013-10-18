@@ -1,12 +1,12 @@
 [string]$LogFile = $input
-$ScriptPath = "C:\Users\epierce.FOREST\Documents\GitHub\MessageServiceWorker-Posh"
+$ScriptPath = "C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh"
 
 Import-Module $ScriptPath\Include\MessageServiceClient.psm1 -Force
 Import-Module $ScriptPath\Include\Import-INI.psm1 -Force
 Import-Module $ScriptPath\Include\AccountProvisioner.psm1 -Force
 Import-Module $ScriptPath\Include\USFProvisionWorker.psm1 -Force
 
-$config = Import-INI "C:\Users\epierce.FOREST\Documents\GitHub\MessageServiceWorker-Posh\Config\ProvisionAccounts.ini"
+$config = Import-INI "C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh\Config\ProvisionAccounts.ini"
 
 $StopWatch = [Diagnostics.Stopwatch]::StartNew()
 

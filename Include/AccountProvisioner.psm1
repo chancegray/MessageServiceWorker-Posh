@@ -13,8 +13,8 @@ function Intialize-Logging() {
 	$logList = Get-EventLog -List
 	
 	if(-not ($logList.log -match $SCRIPT:LogName)) {
-		New-EventLog -LogName $SCRIPT:LogName -Source $SCRIPT:LogSource
-		Write-EventLog -LogName $SCRIPT:LogName -Source $SCRIPT:LogSource -Message "Starting new log file" -EntryType Information -EventId 0
+	#	New-EventLog -LogName $SCRIPT:LogName -Source $SCRIPT:LogSource
+	#	Write-EventLog -LogName $SCRIPT:LogName -Source $SCRIPT:LogSource -Message "Starting new log file" -EntryType Information -EventId 0
 	}
 }
 
@@ -25,7 +25,7 @@ function Write-LogEntry {
         [Parameter(Mandatory=$true,Position=2)] [System.String]$LogMessage
 	)
 		
-		Write-EventLog -LogName $SCRIPT:LogName -Source $SCRIPT:LogSource -EventId $EventId -EntryType $LogLevel -Message $LogMessage
+		#Write-EventLog -LogName $SCRIPT:LogName -Source $SCRIPT:LogSource -EventId $EventId -EntryType $LogLevel -Message $LogMessage
     
 }
 
