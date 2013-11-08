@@ -22,9 +22,9 @@ function ConvertTo-AttributeHash {
 		#'postalCode' = 'DELETE_ATTRIBUTE';
 		#'streetAddress' = 'DELETE_ATTRIBUTE';
 		#'telephoneNumber' = 'DELETE_ATTRIBUTE';
-		#'Company' = 'DELETE_ATTRIBUTE';
-		#'Department' = 'DELETE_ATTRIBUTE'; 
-		#'Description' = 'DELETE_ATTRIBUTE';
+		'Company' = 'DELETE_ATTRIBUTE';
+		'Department' = 'DELETE_ATTRIBUTE'; 
+		'Description' = 'DELETE_ATTRIBUTE';
 		'gidNumber' = 'DELETE_ATTRIBUTE';	
 		'loginShell' = 'DELETE_ATTRIBUTE';
 		'uidNumber' = 'DELETE_ATTRIBUTE';
@@ -79,6 +79,10 @@ function ConvertTo-AttributeHash {
 	if($AttributesFromJSON.USFeduPrimaryAffiliation -eq 'N/A'){
 		$NewAttributes.USFeduPrimaryAffiliation = 'DELETE_ATTRIBUTE';
 	}
+	
+	$NewAttributes.Company = $AttributesFromJSON.USFeduCollege[0]
+	$NewAttributes.Department = $AttributesFromJSON.USFeduDepartment[0]
+	$NewAttributes.Description = $AttributesFromJSON.USFeduAffiliation[0]
 	
 	$NewAttributes.extensionAttribute1 = $AttributesFromJSON.namsid[0]
 	$NewAttributes.USFeduNAMSid = $AttributesFromJSON.namsid[0]
@@ -147,9 +151,26 @@ function Resolve-DefaultContainer {
 			}
 		}
 	} else {
-		#Some VIP groups don't give an ePPA, so we have to go by USFPA
-		if ($UsfPrimaryAffiliation -eq "VIP"){
-			$ParentContainer = $("OU=VIP,OU=NewAccounts,"+$BaseDN)
+		#Some groups don't give an ePPA, so we have to go by USFPA
+		if ($PrimaryAffiliation){
+			switch -regex ($PrimaryAffiliation) {
+				"VIP" {
+					$ParentContainer = $("OU=VIP,OU=NewAccounts,"+$BaseDN)
+					break
+				}
+				"InEd Instructor" {
+					$ParentContainer = $("OU=NewAccounts,"+$BaseDN)
+					break
+				}
+				"InEd Student" {
+					$ParentContainer = $("OU=Accounts,OU=Students,"+$BaseDN)
+					break
+				}
+				default {
+					$ParentContainer = $("OU=No Affiliation,"+$BaseDN)
+					break
+				}
+			}
 		} else {
 			$ParentContainer = $("OU=No Affiliation,"+$BaseDN)
 		}
