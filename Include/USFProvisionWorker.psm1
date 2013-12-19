@@ -80,8 +80,12 @@ function ConvertTo-AttributeHash {
 		$NewAttributes.USFeduPrimaryAffiliation = 'DELETE_ATTRIBUTE';
 	}
 	
-	$NewAttributes.Company = $AttributesFromJSON.USFeduCollege[0]
-	$NewAttributes.Department = $AttributesFromJSON.USFeduDepartment[0]
+	if($AttributesFromJSON.USFeduPrimaryCollege){
+		$NewAttributes.Company = $AttributesFromJSON.USFeduPrimaryCollege[0]
+	}
+	if ($AttributesFromJSON.USFeduPrimaryDepartment) {
+		$NewAttributes.Department = $AttributesFromJSON.USFeduPrimaryDepartment[0]
+	}
 	$NewAttributes.Description = $AttributesFromJSON.USFeduAffiliation[0]
 	
 	$NewAttributes.extensionAttribute1 = $AttributesFromJSON.namsid[0]
