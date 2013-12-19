@@ -1,19 +1,16 @@
 $MaxThreads = 10
 $SleepTimer = 50
-$LogDir = "C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh\Logs"
-$LogFileName = $LogDir+"\provision-accounts.log"
+$ScriptPath = "C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh"
 
-$RunCommand = "C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh\Scripts\UpdateAccounts.ps1"
-$RunCommandINI = "C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh\Config\ProvisionAccounts.ini"
+$LogDir = $ScriptPath+"\Logs"
+$LogFileName = $LogDir+"\update-accounts.log"
+
+$RunCommand = $ScriptPath+"\Scripts\ProvisionAccounts.ps1"
+$RunCommandINI = $ScriptPath+"\Config\ProvisionAccounts.ini"
 
 #Create log file if it doesn't already exist
 if(! [IO.File]::Exists($LogFileName)){
 	New-Item -ItemType file -Path $LogFileName | Out-Null
-}
-
-# Create a pool of X runspaces
-if ($Verbose){
-	Write-Host "Creating $MaxProcs RunSpaces"
 }
 
 # Load Snap-ins we'll need
@@ -26,7 +23,8 @@ for($counter = 1; $counter -le $MaxThreads; $counter++){
 	if(! [IO.File]::Exists($ThreadLogFileName)){
 		New-Item -ItemType file -Path $ThreadLogFileName | Out-Null
 	}
-    Start-Job -InitializationScript $InitBlock -FilePath $RunCommand -InputObject $ThreadLogFileName | Out-Null
+	$InputObject = "update|"+$ScriptPath+"|"+$ThreadLogFileName 
+    Start-Job -InitializationScript $InitBlock -FilePath $RunCommand -InputObject $InputObject  | Out-Null
 	Start-Sleep -Milliseconds $SleepTimer
 }
 
