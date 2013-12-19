@@ -400,4 +400,4 @@ Export-ModuleMember -Function Write-LogEntry
 
 
 #Get the Logfile ready
-Intialize-Logging
+#Intialize-Logging

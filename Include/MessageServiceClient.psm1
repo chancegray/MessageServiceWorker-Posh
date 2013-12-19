@@ -159,7 +159,7 @@ function Publish-QueueMessage($Credentials, [string] $Program, [string] $Queue, 
 {
 	$headers = Get-HttpBasicHeader $Credentials
 	$uri = "$SCRIPT:baseURI/queue/$Queue"
-	$bodyData = @{ apiversion = "1"; createProg = $Program; messageData = $Data } | ConvertTo-Json
+	$bodyData = @{ apiversion = "1"; createProg = $Program; messageData = $Data } | ConvertTo-Json -Depth 5
 	try	{
 		$ProgressPreference = "SilentlyContinue"
 		$result = Invoke-RestMethod -uri $uri -Headers $headers -ContentType "application/json" -Method "POST" -Body $bodyData -ErrorVariable a
