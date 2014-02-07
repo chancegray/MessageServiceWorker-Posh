@@ -188,6 +188,66 @@ function Resolve-DefaultContainer {
 	return $ParentContainer
 }
 
+function Get-ExchangeAccountNeeded {
+	param(
+		[Parameter(Position=0, Mandatory=$true,ValueFromPipeline = $true)] $AttributesFromJSON
+		)
+	$PrimaryAffiliation = $AttributesFromJSON.eduPersonPrimaryAffiliation
+	$UsfPrimaryAffiliation = $AttributesFromJSON.USFeduPrimaryAffiliation
+	
+	#Create an account if we're told to
+	if ($AttributesFromJSON.CreateExchangeAccount -and $AttributesFromJSON.CreateExchangeAccount[0] -eq "Yes"){
+		return $true
+	}
+	
+	if ($PrimaryAffiliation){
+		#Check based on ePPA
+		switch -regex ($PrimaryAffiliation) {
+			"Student" {
+				return $false
+				break
+			}
+			"(Faculty|Staff)" {		
+				#USF Health accounts don't get Exchange accounts from us
+				if($AttributesFromJSON.USFeduCollege -and $AttributesFromJSON.USFeduCollege[0] -match "(Medicine|Public Health|Nursing|Pharmacy)"){
+					return $false
+				#neither do USFSP (they get GoogleApps accounts)
+				} elseif ($AttributesFromJSON.USFeduCampus -and $AttributesFromJSON.USFeduCampus[0] -eq "StPete") {
+					return $false
+				#Everyone else gets one
+				} else {
+					return $true
+				}
+				break
+			}
+			default {
+				#Is this user in a VIP group that grants Exchange accounts?
+				$ParentContainer = $("OU=No Affiliation,"+$BaseDN)
+				break
+			}
+		}
+	} else {
+	#Some groups don't give an ePPA, so we have to go by USFPA
+		if ($PrimaryAffiliation){
+			switch -regex ($PrimaryAffiliation) {
+				"InEd Instructor" {
+					return $true
+					break
+				}
+				default {
+					return $false
+					break
+				}
+			}
+		} else {
+			return $false
+		}
+	}
+	
+	return $false
+}
+
+
 function Confirm-ManagedContainer {
 	param(
         [Parameter(Position=0, Mandatory=$true,ValueFromPipeline = $true)] $Container
@@ -199,7 +259,7 @@ function Confirm-ManagedContainer {
 			$("OU=NewAccounts,"+$BaseDN),
 			$("OU=VIP,OU=NewAccounts,"+$BaseDN),
 			$("OU=NewAccounts,"+$BaseDN),
-			$("OU=USF StPete,"+$BaseDN),
+			$("OU=USF St Pete,"+$BaseDN),
 			$("OU=USF Health,"+$BaseDN),
 			$("OU=Accounts,OU=Students,"+$BaseDN),
 			$("OU=Disabled,OU=Students,"+$BaseDN)
@@ -211,3 +271,4 @@ function Confirm-ManagedContainer {
 Export-ModuleMember -Function Confirm-ManagedContainer
 Export-ModuleMember -Function ConvertTo-AttributeHash
 Export-ModuleMember -Function Resolve-DefaultContainer
+Export-ModuleMember -Function Get-ExchangeAccountNeeded

@@ -253,6 +253,58 @@ function Get-UserExists {
 	}
 }
 
+<#Requires a PowerShell session with the On-Prem Exchange server with '-Prefix OnPrem'#>
+function Get-OnPremMailboxExists {
+    param(
+        [Parameter(Mandatory=$true)] [System.String]$EmailAddress
+    )
+	
+	# Switch to this when/if we upgrade to Exchange 2013
+	#$count = Get-OnPremMailbox -Identity $EmailAddress -IncludeInactiveMailbox -WarningAction silentlyContinue -ErrorAction silentlyContinue | Measure-Object | Select-Object -expand count
+	$count = Get-OnPremMailbox -Identity $EmailAddress -WarningAction silentlyContinue -ErrorAction silentlyContinue | Measure-Object | Select-Object -expand count
+	
+	if ($count -gt 0){
+		return $true
+	} else {
+		return $false
+	}
+}
+
+<#Requires a PowerShell session with the Office365 Exchange server with '-Prefix Azure' #>
+function Get-AzureMailboxExists {
+    param(
+        [Parameter(Mandatory=$true)] [System.String]$EmailAddress
+    )
+
+	$count = Get-AzureMailbox -Identity $EmailAddress -IncludeInactiveMailbox -WarningAction silentlyContinue -ErrorAction silentlyContinue | Measure-Object | Select-Object -expand count
+	
+	if ($count -gt 0){
+		return $true
+	} else {
+		return $false
+	}
+}
+
+<#Requires a PowerShell session with the On-Prem Exchange server with '-Prefix OnPrem'#>
+function Get-OnPremGalAddressExists {
+    param(
+        [Parameter(Mandatory=$true)] [System.String]$EmailAddress
+    )
+
+	$count = Get-OnPremMailUser -Identity $EmailAddress -WarningAction silentlyContinue -ErrorAction silentlyContinue | Measure-Object | Select-Object -expand count
+	
+	if ($count -gt 0){
+		return $true
+	} else {
+		$count = Get-OnPremContact -Identity $EmailAddress -WarningAction silentlyContinue -ErrorAction silentlyContinue | Measure-Object | Select-Object -expand count
+		if ($count -gt 0){
+			return $true
+		} else {
+			return $false
+		}
+	}
+}
+
 function New-Account {
 	[CmdletBinding()]
 	param(
@@ -397,7 +449,9 @@ Export-ModuleMember -Function Add-NonActiveMember
 Export-ModuleMember -Function Remove-NonActiveMember
 Export-ModuleMember -Function Get-AttributesToModify
 Export-ModuleMember -Function Write-LogEntry
-
+Export-ModuleMember -Function Get-AzureMailboxExists
+Export-ModuleMember -Function Get-OnPremMailboxExists
+Export-ModuleMember -Function Get-OnPremGalAddressExists
 
 #Get the Logfile ready
 #Intialize-Logging
