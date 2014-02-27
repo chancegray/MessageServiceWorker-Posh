@@ -221,8 +221,7 @@ function Get-ExchangeAccountNeeded {
 				break
 			}
 			default {
-				#Is this user in a VIP group that grants Exchange accounts?
-				$ParentContainer = $("OU=No Affiliation,"+$BaseDN)
+				return $false
 				break
 			}
 		}
@@ -247,6 +246,50 @@ function Get-ExchangeAccountNeeded {
 	return $false
 }
 
+function Get-HideAddressFromGal {
+	param(
+		[Parameter(Position=0, Mandatory=$true,ValueFromPipeline = $true)] $AttributesFromJSON
+		)
+	$PrimaryAffiliation = $AttributesFromJSON.eduPersonPrimaryAffiliation
+	$UsfPrimaryAffiliation = $AttributesFromJSON.USFeduPrimaryAffiliation
+	
+	#Hide the address if we're told to
+	if ($AttributesFromJSON.USFeduPrivacy -and $AttributesFromJSON.USFeduPrivacy[0] -eq "directory"){
+		return $true
+	}
+	
+	if ($PrimaryAffiliation){
+		#Check based on ePPA
+		switch -regex ($PrimaryAffiliation) {
+			"(Faculty|Staff|Student)" {
+				return $false
+				break
+			}
+			default {
+				return $true
+				break
+			}
+		}
+	} else {
+	#Some groups don't give an ePPA, so we have to go by USFPA
+		if ($PrimaryAffiliation){
+			switch -regex ($PrimaryAffiliation) {
+				"InEd Student" {
+					return $false
+					break
+				}
+				default {
+					return $true
+					break
+				}
+			}
+		} else {
+			return $true
+		}
+	}
+	
+	return $true
+}
 
 function Confirm-ManagedContainer {
 	param(
@@ -268,7 +311,32 @@ function Confirm-ManagedContainer {
 		return $ManagedContainers -contains $Container
 }
 
+function Confirm-ContactNeeded {
+	param(
+        [Parameter(Position=0, Mandatory=$true,ValueFromPipeline = $true)] $EmailAddress
+    )
+	
+		#List of domains we create contacts for
+		$ContactDomains = @(
+			$(".*@mail\.usf\.edu"),
+			$(".*@health\.usf\.edu"),
+			$(".*@usfsp\.edu")
+		)
+		
+		foreach ($element in $ContactDomains) {
+			if ( $EmailAddress -match $element ) {
+				return $true
+			}
+		}
+		
+		return $false
+}
+
+
+
 Export-ModuleMember -Function Confirm-ManagedContainer
 Export-ModuleMember -Function ConvertTo-AttributeHash
 Export-ModuleMember -Function Resolve-DefaultContainer
 Export-ModuleMember -Function Get-ExchangeAccountNeeded
+Export-ModuleMember -Function Get-HideAddressFromGal
+Export-ModuleMember -Function Confirm-ContactNeeded

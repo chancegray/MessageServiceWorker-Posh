@@ -1,14 +1,15 @@
+<#
 [String]$StartupString = $input
 $StartupObject = $StartupString.split("|")
 
 [String]$Action = $StartupObject[0]
 [String]$ScriptPath = $StartupObject[1]
 [String]$LogFile = $StartupObject[2]
-<#
+#>
 $LogFile = "C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh\Logs\test.log"
 $Action="provision"
 $ScriptPath="C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh"
-#>
+
 
 Import-Module MSOnline -Force
 Import-Module $ScriptPath\Include\MessageServiceClient.psm1 -Force
@@ -31,22 +32,24 @@ $UpnDomain = $config["ActiveDirectory"]["UpnDomain"]
 $Domain = $config["ActiveDirectory"]["Domain"]
 $BaseDN = $config["ActiveDirectory"]["BaseDN"]
 
-#Do we already have a connection to the Exchange server?
-if (!(Get-Command Get-OnPremMailbox -ErrorAction silentlyContinue -WarningAction silentlyContinue)) {
+#Do we already have a connection to the Exchange servers?
+if (! (Get-PSSession -Name "OnPremExchange" -ErrorAction SilentlyContinue -WarningAction SilentlyContinue)) {
 	#Connect to On-Premise Exchange
 	$ProgressPreference = "SilentlyContinue";
-	$ExchSession = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri $config["ActiveDirectory"]["ExchangePowerShellURI"] -Authentication Kerberos -Credential $WindowsCredential
-	Import-PSSession $ExchSession -AllowClobber -WarningAction silentlyContinue -Prefix "OnPrem" | Out-Null
+	$ExchSession = New-PSSession -Name "OnPremExchange" -ConfigurationName Microsoft.Exchange -ConnectionUri $config["ActiveDirectory"]["ExchangePowerShellURI"] -Authentication Kerberos -Credential $WindowsCredential
+	Import-PSSession $ExchSession -AllowClobber -WarningAction SilentlyContinue -Prefix "OnPrem" | Out-Null
+	if ($Verbose){ Write-Host "Created OnPremExchange Powershell connection" }
 }
 
-if (!(Get-Command Get-AzureMailbox -ErrorAction silentlyContinue -WarningAction silentlyContinue)) {
+if (! (Get-PSSession -Name "AzureExchange" -ErrorAction SilentlyContinue -WarningAction SilentlyContinue)) {
 	#Connect to Azure Active Directory
-	$O365Session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri https://ps.outlook.com/powershell -Credential $AzureCredential -Authentication Basic -AllowRedirection -WarningAction silentlyContinue
+	$O365Session = New-PSSession -Name "AzureExchange" -ConfigurationName Microsoft.Exchange -ConnectionUri https://ps.outlook.com/powershell -Credential $AzureCredential -Authentication Basic -AllowRedirection -WarningAction SilentlyContinue
 	Import-PSSession $O365Session -AllowClobber -WarningAction silentlyContinue -Prefix "Azure" | Out-Null 
 	Connect-MsolService -Credential $AzureCredential
+	if ($Verbose){ Write-Host "Created AzureExchange Powershell connection" }
 }
 
-#Connect to On-Premise Active Directory
+#Connect to On-Premises Active Directory
 $Connection = Connect-QADService -service $Domain -Credential $WindowsCredential
 
 $QueueName = $config["MessageService"]["UpdateQueueName"]
@@ -182,6 +185,10 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 					}
 				}
 			}
+<############################
+# Provisioning Complete
+# Begin Account Updates
+##############################>
 
 			if($SkipProcessing -ne $true){
 				#Get a HashMap of attributes
@@ -190,7 +197,10 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 				$AttrList = Get-AttributesToModify -UserPrincipalName $UserPrincipalName -Attributes $NewAttributes
 				if ($Verbose){ $AttrList | Format-List } 
 				
+				#Does this user need an Exchange acount and does one already exist?
 				$CreateExchangeAccount = Get-ExchangeAccountNeeded $Message.messageData.attributes
+				$OnPremExchangeAccount = Get-OnPremMailboxExists $UserPrincipalName
+				$AzureExchangeAccount = Get-AzureMailboxExists $UserPrincipalName
 				
 				#Update Account
 				if ($Verbose) { Write-Host "Updating $UserPrincipalName" }
@@ -214,7 +224,62 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 						#Does this user need an Exchange Account?
 						if($CreateExchangeAccount){
 							if($Verbose) { Write-Host "Exchange Account required for $UserPrincipalName" }
-						}		
+						} else {
+						#User is NOT eligible for Exchange
+						
+							#If this account already has an Exchange account, disable it
+							if($OnPremExchangeAccount){
+								Disable-OnPremMailboxAccess $UserPrincipalName
+							} elseif($AzureExchangeAccount) {
+								Disable-AzureMailboxAccess $UserPrincipalName
+							} else {
+							#User does not have an existing Exchange account
+																				
+								#Does the user have an email address at all?
+								if($Message.messageData.attributes.USFeduPrimaryEmail -and $Message.messageData.attributes.USFeduPrimaryEmail[0] -match '.*@.*'){
+									$PrimaryEmail = $Message.messageData.attributes.USFeduPrimaryEmail[0]
+									if($Verbose) { Write-Host "$UserPrincipalName has an email address: $PrimaryEmail" }
+									
+									#Should this address be hidden from the GAL?
+									$HideAddressFromGal = Get-HideAddressFromGal -AttributesFromJSON $Message.messageData.attributes
+									
+									#Is this address already in the GAL?
+									if (Get-OnPremGalAddressExists -EmailAddress $PrimaryEmail) {
+										if($Verbose) { Write-Host "$PrimaryEmail is already in the GAL" }
+										$OnPremGalAddressHidden = Get-OnPremGalAddressHidden -EmailAddress $PrimaryEmail
+										
+										#Hide/Show Address where needed
+										if( $OnPremGalAddressHidden -ne $HideAddressFromGal ) {
+											if ($HideAddressFromGal){
+												if($Verbose) { Write-Host "Hiding $PrimaryEmail from the GAL" }
+												Set-OnPremGalAddressHidden -EmailAddress $PrimaryEmail -Value $true
+											} else {
+												if($Verbose) { Write-Host "Making $PrimaryEmail visible to the GAL" }
+												Set-OnPremGalAddressHidden -EmailAddress $PrimaryEmail -Value $false
+											}
+										}								
+									} else {
+										if($Verbose) { Write-Host "$PrimaryEmail is not in the GAL" }
+										# Mail-enable the user if necessary
+										if ((! $HideAddressFromGal) -and (Confirm-ContactNeeded $PrimaryEmail) ) {
+											
+											#is the user already mail-enabled with another address?
+											if (Get-OnPremMailUser -Identity $UserPrincipalName -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Out-Null){
+												Set-OnPremMailUser -Identity $UserPrincipalName -ExternalEmailAddress $PrimaryEmail -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Out-Null
+											} else {
+												Enable-OnPremMailUser -Identity $UserPrincipalName -ExternalEmailAddress $PrimaryEmail -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Out-Null
+											}
+											if($Verbose) { Write-Host "Added $PrimaryEmail to the GAL" }
+											
+											#Because of the default email address policy that is applied to addresses in forest, we need to remove the @usf.edu and @onmicrsoft.com addresses
+											$EmailAddresses = (Get-OnPremMailUser -Identity $UserPrincipalName -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Select-Object EmailAddresses).EmailAddresses -notmatch ".*@usf.edu|.*@.*onmicrosoft.com"
+											Set-OnPremMailUser -Identity $UserPrincipalName -EmailAddresses $EmailAddresses -EmailAddressPolicyEnabled $false | Out-Null
+											if ($Verbose){ "Disabled default email address policy for $UserPrincipalName" }
+										}
+									}
+								}
+							}
+						}
 						
 						#Get correct account location
 						$DefaultParentContainer = Resolve-DefaultContainer -AttributesFromJSON $Message.messageData.attributes -BaseDN $BaseDN

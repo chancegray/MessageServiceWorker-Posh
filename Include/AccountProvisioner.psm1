@@ -59,6 +59,9 @@ function Compare-Attributes {
 			$diff = @(Compare-Object $refValue $difValue -SyncWindow 1000).length -eq 0
 			if ( -not $diff){
 				Write-LogEntry 1 Information "Compare-Attributes: $key is different (array)"
+				#$tempArray = New-Object System.Collections.ArrayList($null)
+				#$tempArray.AddRange($difValue)
+				#$tempArray.Remove("")
 				$result.$key = $difValue
 			}
 	  }
@@ -286,6 +289,44 @@ function Get-AzureMailboxExists {
 }
 
 <#Requires a PowerShell session with the On-Prem Exchange server with '-Prefix OnPrem'#>
+function Disable-OnPremMailboxAccess {
+    param(
+        [Parameter(Mandatory=$true)] [System.String]$EmailAddress
+    )
+	
+	return Disable-OnPremMailbox $EmailAddress
+}
+
+<#Requires a PowerShell session with the Office365 Exchange server with '-Prefix Azure' #>
+function Disable-AzureMailboxAccess {
+    param(
+        [Parameter(Mandatory=$true)] [System.String]$EmailAddress
+    )
+
+	#Disable access according to http://help.outlook.com/en-us/140/ee423638.aspx
+	return Set-AzureCASMailbox $EmailAddress -OWAEnabled $false -PopEnabled $false -ImapEnabled $false -MAPIEnabled $false -ActiveSyncEnabled $false -EwsEnabled $false 
+}
+
+<#Requires a PowerShell session with the On-Prem Exchange server with '-Prefix OnPrem'#>
+function Enable-OnPremMailboxAccess {
+    param(
+        [Parameter(Mandatory=$true)] [System.String]$EmailAddress
+    )
+	
+	return Enable-OnPremMailbox $EmailAddress
+}
+
+<#Requires a PowerShell session with the Office365 Exchange server with '-Prefix Azure' #>
+function Enable-AzureMailboxAccess {
+    param(
+        [Parameter(Mandatory=$true)] [System.String]$EmailAddress
+    )
+
+	#Enable access according to http://help.outlook.com/en-us/140/ee423638.aspx
+	return Set-AzureCASMailbox $EmailAddress -OWAEnabled $true -PopEnabled $true -ImapEnabled $true -MAPIEnabled $true -ActiveSyncEnabled $true -EwsEnabled $true 
+}
+
+<#Requires a PowerShell session with the On-Prem Exchange server with '-Prefix OnPrem'#>
 function Get-OnPremGalAddressExists {
     param(
         [Parameter(Mandatory=$true)] [System.String]$EmailAddress
@@ -303,6 +344,32 @@ function Get-OnPremGalAddressExists {
 			return $false
 		}
 	}
+}
+
+<#Requires a PowerShell session with the On-Prem Exchange server with '-Prefix OnPrem'#>
+function Get-OnPremGalAddressHidden {
+    param(
+        [Parameter(Mandatory=$true)] [System.String]$EmailAddress
+    )
+
+	$AccountHidden = (Get-OnPremMailUser -Identity $EmailAddress -WarningAction silentlyContinue -ErrorAction silentlyContinue).HiddenFromAddressListsEnabled 
+	
+	if ($AccountHidden -eq $true){
+		return $true
+	} else {
+		return $false
+	}
+}
+
+<#Requires a PowerShell session with the On-Prem Exchange server with '-Prefix OnPrem'#>
+function Set-OnPremGalAddressHidden {
+    param(
+        [Parameter(Mandatory=$true)] [System.String]$EmailAddress,
+		[Parameter(Mandatory=$true)] [Bool]$Value
+    )
+
+	Get-OnPremMailUser -Identity $EmailAddress -WarningAction silentlyContinue -ErrorAction silentlyContinue | Set-OnPremMailUser -HiddenFromAddressListsEnabled $Value -WarningAction silentlyContinue -ErrorAction silentlyContinue
+
 }
 
 function New-Account {
@@ -451,7 +518,13 @@ Export-ModuleMember -Function Get-AttributesToModify
 Export-ModuleMember -Function Write-LogEntry
 Export-ModuleMember -Function Get-AzureMailboxExists
 Export-ModuleMember -Function Get-OnPremMailboxExists
+Export-ModuleMember -Function Disable-OnPremMailboxAccess
+Export-ModuleMember -Function Disable-AzureMailboxAccess
+Export-ModuleMember -Function Enable-OnPremMailboxAccess
+Export-ModuleMember -Function Enable-AzureMailboxAccess
 Export-ModuleMember -Function Get-OnPremGalAddressExists
+Export-ModuleMember -Function Get-OnPremGalAddressHidden
+Export-ModuleMember -Function Set-OnPremGalAddressHidden
 
 #Get the Logfile ready
 #Intialize-Logging
