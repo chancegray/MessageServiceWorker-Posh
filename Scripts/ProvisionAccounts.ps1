@@ -54,6 +54,7 @@ $Connection = Connect-QADService -service $Domain -Credential $WindowsCredential
 
 $QueueName = $config["MessageService"]["UpdateQueueName"]
 $ProvisionQueueName = $config["MessageService"]["ProvisionQueueName"]
+$AzureQueueName = $config["MessageService"]["AzureQueueName"]
 $ConfirmationTopicName = $config["MessageService"]["ConfirmationTopicName"]
 
 if($Action -eq "provision"){
@@ -224,6 +225,12 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 						#Does this user need an Exchange Account?
 						if($CreateExchangeAccount){
 							if($Verbose) { Write-Host "Exchange Account required for $UserPrincipalName" }
+							
+							#If the user doesn't already have an Exchange account put it on the Windows Azure queue
+							if ( (! $OnPremExchangeAccount) -and (! $AzureExchangeAccount)) {
+								if($Verbose) { Write-Host "Publishing message to Windows Azure queue" }
+								Publish-QueueMessage -Credentials $MessageServiceCredential -Program "edu:usf:cims:PowerShell:ProvisionAccounts" -Queue $AzureQueueName -Data $Message.messageData
+							}
 						} else {
 						#User is NOT eligible for Exchange
 						
