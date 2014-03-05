@@ -337,10 +337,10 @@ function Resolve-CimsGroups {
 		[Parameter(Position=0, Mandatory=$true,ValueFromPipeline = $true)] $AttributesFromJSON
 		)
 	
-	if ($AttributesFromJSON.CimsGroups.length -gt 0){
+	if ($AttributesFromJSON.CimsGroups.count -gt 0){
 		return [System.Array] $AttributesFromJSON.CimsGroups
 	} else {
-		return $()
+		return [System.Array] $()
 	}
 }
 	

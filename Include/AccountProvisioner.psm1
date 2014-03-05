@@ -543,19 +543,20 @@ function Get-CurrentCimsGroupList {
 	
 	$GroupDNlist = Get-QADUser -Identity $UserPrincipalName | Select-Object "memberOf"
 	$array = [regex]::matches($GroupDNlist.MemberOf, "CN=(CIMS.*?),.*?") | % {$_.Result('$1')}
-	return $array
+	return [System.Array] $array
 }
 
 function Set-CimsGroups {
 	[CmdletBinding()]
 	param(
         [Parameter(Mandatory=$true)] [System.String]$UserPrincipalName,
-		[Parameter(Mandatory=$true)] [System.Array]$NewCimsGroups
+		[Parameter(Mandatory=$true)] $NewCimsGroups
     )
 	
 	$CurrentCimsGroupList = Get-CurrentCimsGroupList -UserPrincipalName $UserPrincipalName
 	
-	if ($CurrentCimsGroupList.length -lt 1){ $CurrentCimsGroupList = @()}
+	if (! $CurrentCimsGroupList.count -gt 0){ $CurrentCimsGroupList = @()}
+	if (! $NewCimsGroups -gt 0){ $NewCimsGroups = @()}
 	
 	$AddList = (Compare-Object $NewCimsGroups $CurrentCimsGroupList | Where {$_.SideIndicator -eq '<='} | Select-Object InputObject).InputObject
 	$RemoveList = (Compare-Object $NewCimsGroups $CurrentCimsGroupList | Where {$_.SideIndicator -eq '=>'} | Select-Object InputObject).InputObject
@@ -567,7 +568,7 @@ function Set-CimsGroups {
 		Remove-QADGroupMember -Identity $group -Member $UserPrincipalName | Out-Null
 	}
 	
-
+	return "Group Results: [Added: $AddList] [Removed: $RemoveList]"
 }
 
 

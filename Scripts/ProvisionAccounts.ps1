@@ -7,7 +7,7 @@ $StartupObject = $StartupString.split("|")
 [String]$LogFile = $StartupObject[2]
 #>
 $LogFile = "C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh\Logs\test.log"
-$Action="provision"
+$Action="update"
 $ScriptPath="C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh"
 
 
@@ -242,14 +242,16 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 					$CurrentAccount = Get-QADUser -UserPrincipalName $UserPrincipalName -IncludedProperties userAccountControl
 					
 					#Update CIMS Groups
-					$CimsGroups = Resolve-CimsGroups -AttributesFromJSON $Message.messageData.attributes
 					$CurrentCimsGroups = Get-CurrentCimsGroupList -UserPrincipalName $UserPrincipalName
 					
-					if ($Verbose) { 
-						Write-Host "Current CIMS groups: $CurrentCimsGroups"
-						Write-Host "Updating $UserPrincipalName to be a member of groups: $CimsGroups"
-					}
-					Set-CimsGroups -UserPrincipalName $UserPrincipalName -NewCimsGroups $CimsGroups
+					#if (! $CimsGroups.Count -gt 0) { [System.Array] $CimsGroups = $() }
+					if (! $CurrentCimsGroups.Count -gt 0) { [System.Array] $CurrentCimsGroups = $() }
+					
+					if ($Verbose) { Write-Host "Current CIMS groups: $CurrentCimsGroups"}
+					
+					$Results = Set-CimsGroups -UserPrincipalName $UserPrincipalName -NewCimsGroups $Message.messageData.attributes.CimsGroups
+					(Get-Date -Format s)+"|"+$UserPrincipalName+" "+$Results | Out-File $LogFile -Append -Force
+					if ($Verbose) { Write-Host $Results }
 					
 					#Is this account in a managed OU?
 					$CurrentParentContainer = $CurrentAccount.ParentContainerDN.ToString()
