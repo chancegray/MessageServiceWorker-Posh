@@ -75,7 +75,7 @@ function ConvertTo-AttributeHash {
 		}
 	}
 	
-	#Fix specific attributes that differ between LDAP and AD
+	#Fix specific attribute names or values that differ between LDAP and AD
 	if($AttributesFromJSON.USFeduPrimaryAffiliation -eq 'N/A'){
 		$NewAttributes.USFeduPrimaryAffiliation = 'DELETE_ATTRIBUTE';
 	}
@@ -230,7 +230,7 @@ function Get-ExchangeAccountNeeded {
 		if ($PrimaryAffiliation){
 			switch -regex ($PrimaryAffiliation) {
 				"InEd Instructor" {
-					return $true
+					return $false
 					break
 				}
 				default {
@@ -332,7 +332,18 @@ function Confirm-ContactNeeded {
 		return $false
 }
 
-
+function Resolve-CimsGroups {
+	param(
+		[Parameter(Position=0, Mandatory=$true,ValueFromPipeline = $true)] $AttributesFromJSON
+		)
+	
+	if ($AttributesFromJSON.CimsGroups.length -gt 0){
+		return [System.Array] $AttributesFromJSON.CimsGroups
+	} else {
+		return $()
+	}
+}
+	
 
 Export-ModuleMember -Function Confirm-ManagedContainer
 Export-ModuleMember -Function ConvertTo-AttributeHash
@@ -340,3 +351,4 @@ Export-ModuleMember -Function Resolve-DefaultContainer
 Export-ModuleMember -Function Get-ExchangeAccountNeeded
 Export-ModuleMember -Function Get-HideAddressFromGal
 Export-ModuleMember -Function Confirm-ContactNeeded
+Export-ModuleMember -Function Resolve-CimsGroups
