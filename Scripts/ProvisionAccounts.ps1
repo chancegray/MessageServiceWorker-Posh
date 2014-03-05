@@ -44,7 +44,7 @@ if (! (Get-PSSession -Name "OnPremExchange" -ErrorAction SilentlyContinue -Warni
 if (! (Get-PSSession -Name "AzureExchange" -ErrorAction SilentlyContinue -WarningAction SilentlyContinue)) {
 	#Connect to Azure Active Directory
 	$O365Session = New-PSSession -Name "AzureExchange" -ConfigurationName Microsoft.Exchange -ConnectionUri https://ps.outlook.com/powershell -Credential $AzureCredential -Authentication Basic -AllowRedirection -WarningAction SilentlyContinue
-	Import-PSSession $O365Session -AllowClobber -WarningAction silentlyContinue -Prefix "Azure" | Out-Null 
+	Import-PSSession $O365Session -AllowClobber -WarningAction SilentlyContinue -Prefix "Azure" | Out-Null 
 	Connect-MsolService -Credential $AzureCredential
 	if ($Verbose){ Write-Host "Created AzureExchange Powershell connection" }
 }
@@ -52,14 +52,10 @@ if (! (Get-PSSession -Name "AzureExchange" -ErrorAction SilentlyContinue -Warnin
 #Connect to On-Premises Active Directory
 $Connection = Connect-QADService -service $Domain -Credential $WindowsCredential
 
-$QueueName = $config["MessageService"]["UpdateQueueName"]
+$UpdateQueueName = $config["MessageService"]["UpdateQueueName"]
 $ProvisionQueueName = $config["MessageService"]["ProvisionQueueName"]
 $AzureQueueName = $config["MessageService"]["AzureQueueName"]
 $ConfirmationTopicName = $config["MessageService"]["ConfirmationTopicName"]
-
-if($Action -eq "provision"){
-	$QueueName = $ProvisionQueueName
-}
 
 $MaxMessages = $config["MessageService"]["MaxMessages"]
 $MaxThreads = $config["MessageService"]["MaxThreads"]
@@ -71,9 +67,13 @@ if ($config["ActiveDirectory"]["Verbose"] -eq "true"){
 	$Verbose = $false
 }
 
-if ($Verbose){
-	Write-Host "Retreiving" $MaxMessages "messages" | Out-File $LogFile -Append -Force
+switch ($Action) {
+	"provision" { $QueueName = $ProvisionQueueName }
+	"azureProvision" { $QueueName = $AzureQueueName }
+	default { $QueueName = $UpdateQueueName }
 }
+
+if ($Verbose){ Write-Host "Retreiving" $MaxMessages "messages from " $QueueName }
 
 $TotalMessages = 0
 $Created = 0
@@ -100,9 +100,8 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 			$GivenName = $Message.messageData.attributes.givenName[0]
 			$FamilyName = $Message.messageData.attributes.sn[0]
 			
-			if ($Verbose){
-				Write-Host "This user has" $Message.messageData.attributes.uid.length "uid entries"
-			}
+			if ($Verbose){ Write-Host "This user has" $Message.messageData.attributes.uid.length "uid entries" }
+			
 			if($Message.messageData.attributes.uid.length -gt 1){
 				#Multiple NetIDs - Check the primary one first
 				$Username = $Message.messageData.attributes.uid[0]
@@ -186,6 +185,40 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 					}
 				}
 			}
+
+<#################################
+# Account Provisioning Complete
+# Begin Azure Account Provisioning
+##################################>
+
+			if($Action -eq "azureProvision"){
+			
+				#Does a Windows Azure account exist for this user?
+				if ( Get-MsolUserExists -UserPrincipalName $UserPrincipalName ){
+					if ($Verbose){ Write-Host "$UserPrincipalName exists in Windows Azure" }
+					
+					#Is the user already Licensed?
+					if(Get-MsolUserIsLicensed -UserPrincipalName $UserPrincipalName){
+						#Get Licenses
+						$Licenses = Get-MsolUserLicenses -UserPrincipalName $UserPrincipalName
+						if ($Verbose){ Write-Host "$UserPrincipalName has these licenses: $Licenses" }
+					} else {
+						#License User - the mailbox is created automatically
+						if ($Verbose){ Write-Host "Adding licenses to $UserPrincipalName" }
+						Set-MsolUserLicenses -UserPrincipalName $UserPrincipalName
+					}
+					
+					#Remove Message from Windows Azure Queue
+					Remove-QueueMessage -Credentials $MessageServiceCredential -Queue $QueueName -Id $Message.id -Verbose $Verbose
+				} else {
+					if ($Verbose){ Write-Host "$UserPrincipalName does not exist in Windows Azure. Skipping." }
+				}
+			
+				#Skip all other processing
+				$SkipProcessing = $true
+			
+			}
+			
 <############################
 # Provisioning Complete
 # Begin Account Updates
@@ -207,6 +240,16 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 				if ($Verbose) { Write-Host "Updating $UserPrincipalName" }
 				try {
 					$CurrentAccount = Get-QADUser -UserPrincipalName $UserPrincipalName -IncludedProperties userAccountControl
+					
+					#Update CIMS Groups
+					$CimsGroups = Resolve-CimsGroups -AttributesFromJSON $Message.messageData.attributes
+					$CurrentCimsGroups = Get-CurrentCimsGroupList -UserPrincipalName $UserPrincipalName
+					
+					if ($Verbose) { 
+						Write-Host "Current CIMS groups: $CurrentCimsGroups"
+						Write-Host "Updating $UserPrincipalName to be a member of groups: $CimsGroups"
+					}
+					Set-CimsGroups -UserPrincipalName $UserPrincipalName -NewCimsGroups $CimsGroups
 					
 					#Is this account in a managed OU?
 					$CurrentParentContainer = $CurrentAccount.ParentContainerDN.ToString()

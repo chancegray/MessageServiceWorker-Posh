@@ -256,6 +256,75 @@ function Get-UserExists {
 	}
 }
 
+<#Requires a PowerShell session with the Windows Azure server #>
+function Get-MsolUserExists {
+    param(
+        [Parameter(Mandatory=$true)] [System.String]$UserPrincipalName
+    )
+
+	$count = Get-MsolUser -UserPrincipalName $UserPrincipalName -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Measure-Object | Select-Object -expand count
+	
+	if ($count -gt 0){
+		return $true
+	} else {
+		return $false
+	}
+}
+
+<#Requires a PowerShell session with the Windows Azure server #>
+function Get-MsolUserLicenses {
+    param(
+        [Parameter(Mandatory=$true)] [System.String]$UserPrincipalName
+    )
+
+	$LicenseList = @()
+
+	$RawList = (Get-MsolUser -UserPrincipalName $UserPrincipalName -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Select-Object Licenses).Licenses
+	
+		foreach ($license in $RawList) {
+			$LicenseList = $LicenseList + $license.AccountSkuId
+		}
+	
+	return $LicenseList
+}
+
+<#Requires a PowerShell session with the Windows Azure server #>
+function Set-MsolUserLicenses {
+    param(
+        [Parameter(Mandatory=$true)] [System.String]$UserPrincipalName
+    )
+
+	#Usage location must be 'US'
+	Set-MsolUser -UserPrincipalName $UserPrincipalName -UsageLocation US
+	
+	$ExchangeLicenseOptions = New-MsolLicenseOptions -AccountSkuId usfedu:STANDARDWOFFPACK_FACULTY -DisabledPlans MCOSTANDARD
+	Set-MsolUserLicense -UserPrincipalName $UserPrincipalName -LicenseOptions $ExchangeLicenseOptions -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Out-Null
+	
+	
+	#When/if we roll out Project On-line to everyone, this will need to change to:
+	#$ExchangeLicenseOptions = New-MsolLicenseOptions -AccountSkuId usfedu:STANDARDWOFFPACK_FACULTY -DisabledPlans MCOSTANDARD,SHAREPOINTSTANDARD_EDU
+	#$SharepointLicenseOptions = New-MsolLicenseOptions -AccountSkuId usfedu:PROJECTONLINE_PLAN_1_FACULTY -DisabledPlans SHAREPOINTWAC_EDU
+	#
+	#Set-MsolUserLicense -UserPrincipalName $UserPrincipalName -LicenseOptions $ExchangeLicenseOptions -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Out-Null
+	#Set-MsolUserLicense -UserPrincipalName $UserPrincipalName -LicenseOptions $SharepointLicenseOptions -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Out-Null
+	
+}
+
+<#Requires a PowerShell session with the Windows Azure server #>
+function Get-MsolUserIsLicensed {
+    param(
+        [Parameter(Mandatory=$true)] [System.String]$UserPrincipalName
+    )
+
+	$IsLicensed = (Get-MsolUser -UserPrincipalName $UserPrincipalName -WarningAction SilentlyContinue -ErrorAction SilentlyContinue).IsLicensed
+
+	if ($IsLicensed -eq $true){
+		return $true
+	} else {
+		return $false
+	}
+}
+
 <#Requires a PowerShell session with the On-Prem Exchange server with '-Prefix OnPrem'#>
 function Get-OnPremMailboxExists {
     param(
@@ -263,8 +332,8 @@ function Get-OnPremMailboxExists {
     )
 	
 	# Switch to this when/if we upgrade to Exchange 2013
-	#$count = Get-OnPremMailbox -Identity $EmailAddress -IncludeInactiveMailbox -WarningAction silentlyContinue -ErrorAction silentlyContinue | Measure-Object | Select-Object -expand count
-	$count = Get-OnPremMailbox -Identity $EmailAddress -WarningAction silentlyContinue -ErrorAction silentlyContinue | Measure-Object | Select-Object -expand count
+	#$count = Get-OnPremMailbox -Identity $EmailAddress -IncludeInactiveMailbox -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Measure-Object | Select-Object -expand count
+	$count = Get-OnPremMailbox -Identity $EmailAddress -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Measure-Object | Select-Object -expand count
 	
 	if ($count -gt 0){
 		return $true
@@ -279,7 +348,7 @@ function Get-AzureMailboxExists {
         [Parameter(Mandatory=$true)] [System.String]$EmailAddress
     )
 
-	$count = Get-AzureMailbox -Identity $EmailAddress -IncludeInactiveMailbox -WarningAction silentlyContinue -ErrorAction silentlyContinue | Measure-Object | Select-Object -expand count
+	$count = Get-AzureMailbox -Identity $EmailAddress -IncludeInactiveMailbox -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Measure-Object | Select-Object -expand count
 	
 	if ($count -gt 0){
 		return $true
@@ -332,12 +401,12 @@ function Get-OnPremGalAddressExists {
         [Parameter(Mandatory=$true)] [System.String]$EmailAddress
     )
 
-	$count = Get-OnPremMailUser -Identity $EmailAddress -WarningAction silentlyContinue -ErrorAction silentlyContinue | Measure-Object | Select-Object -expand count
+	$count = Get-OnPremMailUser -Identity $EmailAddress -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Measure-Object | Select-Object -expand count
 	
 	if ($count -gt 0){
 		return $true
 	} else {
-		$count = Get-OnPremContact -Identity $EmailAddress -WarningAction silentlyContinue -ErrorAction silentlyContinue | Measure-Object | Select-Object -expand count
+		$count = Get-OnPremContact -Identity $EmailAddress -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Measure-Object | Select-Object -expand count
 		if ($count -gt 0){
 			return $true
 		} else {
@@ -352,7 +421,7 @@ function Get-OnPremGalAddressHidden {
         [Parameter(Mandatory=$true)] [System.String]$EmailAddress
     )
 
-	$AccountHidden = (Get-OnPremMailUser -Identity $EmailAddress -WarningAction silentlyContinue -ErrorAction silentlyContinue).HiddenFromAddressListsEnabled 
+	$AccountHidden = (Get-OnPremMailUser -Identity $EmailAddress -WarningAction SilentlyContinue -ErrorAction SilentlyContinue).HiddenFromAddressListsEnabled 
 	
 	if ($AccountHidden -eq $true){
 		return $true
@@ -368,7 +437,7 @@ function Set-OnPremGalAddressHidden {
 		[Parameter(Mandatory=$true)] [Bool]$Value
     )
 
-	Get-OnPremMailUser -Identity $EmailAddress -WarningAction silentlyContinue -ErrorAction silentlyContinue | Set-OnPremMailUser -HiddenFromAddressListsEnabled $Value -WarningAction silentlyContinue -ErrorAction silentlyContinue
+	Get-OnPremMailUser -Identity $EmailAddress -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Set-OnPremMailUser -HiddenFromAddressListsEnabled $Value -WarningAction SilentlyContinue -ErrorAction SilentlyContinue
 
 }
 
@@ -477,6 +546,31 @@ function Get-CurrentCimsGroupList {
 	return $array
 }
 
+function Set-CimsGroups {
+	[CmdletBinding()]
+	param(
+        [Parameter(Mandatory=$true)] [System.String]$UserPrincipalName,
+		[Parameter(Mandatory=$true)] [System.Array]$NewCimsGroups
+    )
+	
+	$CurrentCimsGroupList = Get-CurrentCimsGroupList -UserPrincipalName $UserPrincipalName
+	
+	if ($CurrentCimsGroupList.length -lt 1){ $CurrentCimsGroupList = @()}
+	
+	$AddList = (Compare-Object $NewCimsGroups $CurrentCimsGroupList | Where {$_.SideIndicator -eq '<='} | Select-Object InputObject).InputObject
+	$RemoveList = (Compare-Object $NewCimsGroups $CurrentCimsGroupList | Where {$_.SideIndicator -eq '=>'} | Select-Object InputObject).InputObject
+
+	foreach ($group in $AddList) {
+		Add-QADGroupMember -Identity $group -Member $UserPrincipalName | Out-Null
+	}
+	foreach ($group in $RemoveList) {
+		Remove-QADGroupMember -Identity $group -Member $UserPrincipalName | Out-Null
+	}
+	
+
+}
+
+
 function Confirm-NonActiveMember {
 	[CmdletBinding()]
 	param(
@@ -511,6 +605,7 @@ Export-ModuleMember -Function New-Account
 Export-ModuleMember -Function Set-Account
 Export-ModuleMember -Function Move-Account
 Export-ModuleMember -Function Get-CurrentCimsGroupList
+Export-ModuleMember -Function Set-CimsGroups
 Export-ModuleMember -Function Confirm-NonActiveMember
 Export-ModuleMember -Function Add-NonActiveMember
 Export-ModuleMember -Function Remove-NonActiveMember
@@ -525,6 +620,11 @@ Export-ModuleMember -Function Enable-AzureMailboxAccess
 Export-ModuleMember -Function Get-OnPremGalAddressExists
 Export-ModuleMember -Function Get-OnPremGalAddressHidden
 Export-ModuleMember -Function Set-OnPremGalAddressHidden
+Export-ModuleMember -Function Get-MsolUserExists
+Export-ModuleMember -Function Get-MsolUserLicenses
+Export-ModuleMember -Function Set-MsolUserLicenses
+Export-ModuleMember -Function Get-MsolUserIsLicensed
+
 
 #Get the Logfile ready
 #Intialize-Logging
