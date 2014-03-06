@@ -298,15 +298,15 @@ function Set-MsolUserLicenses {
 	Set-MsolUser -UserPrincipalName $UserPrincipalName -UsageLocation US
 	
 	$ExchangeLicenseOptions = New-MsolLicenseOptions -AccountSkuId usfedu:STANDARDWOFFPACK_FACULTY -DisabledPlans MCOSTANDARD
-	Set-MsolUserLicense -UserPrincipalName $UserPrincipalName -LicenseOptions $ExchangeLicenseOptions -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Out-Null
+	Set-MsolUserLicense -UserPrincipalName $UserPrincipalName -AddLicenses usfedu:STANDARDWOFFPACK_FACULTY -LicenseOptions $ExchangeLicenseOptions -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Out-Null
 	
 	
 	#When/if we roll out Project On-line to everyone, this will need to change to:
 	#$ExchangeLicenseOptions = New-MsolLicenseOptions -AccountSkuId usfedu:STANDARDWOFFPACK_FACULTY -DisabledPlans MCOSTANDARD,SHAREPOINTSTANDARD_EDU
 	#$SharepointLicenseOptions = New-MsolLicenseOptions -AccountSkuId usfedu:PROJECTONLINE_PLAN_1_FACULTY -DisabledPlans SHAREPOINTWAC_EDU
 	#
-	#Set-MsolUserLicense -UserPrincipalName $UserPrincipalName -LicenseOptions $ExchangeLicenseOptions -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Out-Null
-	#Set-MsolUserLicense -UserPrincipalName $UserPrincipalName -LicenseOptions $SharepointLicenseOptions -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Out-Null
+	#Set-MsolUserLicense -UserPrincipalName $UserPrincipalName -AddLicenses usfedu:STANDARDWOFFPACK_FACULTY -LicenseOptions $ExchangeLicenseOptions -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Out-Null
+	#Set-MsolUserLicense -UserPrincipalName $UserPrincipalName -AddLicenses usfedu:PROJECTONLINE_PLAN_1_FACULTY -LicenseOptions $SharepointLicenseOptions -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Out-Null
 	
 }
 

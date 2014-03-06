@@ -199,7 +199,7 @@ function Get-ExchangeAccountNeeded {
 	if ($AttributesFromJSON.CreateExchangeAccount -and $AttributesFromJSON.CreateExchangeAccount[0] -eq "Yes"){
 		return $true
 	}
-	
+		
 	if ($PrimaryAffiliation){
 		#Check based on ePPA
 		switch -regex ($PrimaryAffiliation) {

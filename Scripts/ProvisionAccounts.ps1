@@ -1,15 +1,13 @@
-<#
 [String]$StartupString = $input
 $StartupObject = $StartupString.split("|")
-
 [String]$Action = $StartupObject[0]
 [String]$ScriptPath = $StartupObject[1]
 [String]$LogFile = $StartupObject[2]
-#>
+<#
 $LogFile = "C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh\Logs\test.log"
 $Action="update"
 $ScriptPath="C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh"
-
+#>
 
 Import-Module MSOnline -Force
 Import-Module $ScriptPath\Include\MessageServiceClient.psm1 -Force
@@ -41,12 +39,14 @@ if (! (Get-PSSession -Name "OnPremExchange" -ErrorAction SilentlyContinue -Warni
 	if ($Verbose){ Write-Host "Created OnPremExchange Powershell connection" }
 }
 
-if (! (Get-PSSession -Name "AzureExchange" -ErrorAction SilentlyContinue -WarningAction SilentlyContinue)) {
-	#Connect to Azure Active Directory
-	$O365Session = New-PSSession -Name "AzureExchange" -ConfigurationName Microsoft.Exchange -ConnectionUri https://ps.outlook.com/powershell -Credential $AzureCredential -Authentication Basic -AllowRedirection -WarningAction SilentlyContinue
-	Import-PSSession $O365Session -AllowClobber -WarningAction SilentlyContinue -Prefix "Azure" | Out-Null 
-	Connect-MsolService -Credential $AzureCredential
-	if ($Verbose){ Write-Host "Created AzureExchange Powershell connection" }
+if($Action -eq "azureProvision") {
+	if (! (Get-PSSession -Name "AzureExchange" -ErrorAction SilentlyContinue -WarningAction SilentlyContinue)) {
+		#Connect to Azure Active Directory
+		$O365Session = New-PSSession -Name "AzureExchange" -ConfigurationName Microsoft.Exchange -ConnectionUri https://ps.outlook.com/powershell -Credential $AzureCredential -Authentication Basic -AllowRedirection -WarningAction SilentlyContinue
+		Import-PSSession $O365Session -AllowClobber -WarningAction SilentlyContinue -Prefix "Azure" | Out-Null 
+		Connect-MsolService -Credential $AzureCredential
+		if ($Verbose){ Write-Host "Created AzureExchange Powershell connection" }
+	}
 }
 
 #Connect to On-Premises Active Directory
@@ -192,26 +192,36 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 ##################################>
 
 			if($Action -eq "azureProvision"){
+				(Get-Date -Format s)+"|Started Azure Provisioning for: "+$UserPrincipalName | Out-File $LogFile -Append -Force
 			
 				#Does a Windows Azure account exist for this user?
 				if ( Get-MsolUserExists -UserPrincipalName $UserPrincipalName ){
 					if ($Verbose){ Write-Host "$UserPrincipalName exists in Windows Azure" }
-					
+					(Get-Date -Format s)+"|"+$UserPrincipalName+" found in Windows Azure."  | Out-File $LogFile -Append -Force
 					#Is the user already Licensed?
 					if(Get-MsolUserIsLicensed -UserPrincipalName $UserPrincipalName){
 						#Get Licenses
 						$Licenses = Get-MsolUserLicenses -UserPrincipalName $UserPrincipalName
 						if ($Verbose){ Write-Host "$UserPrincipalName has these licenses: $Licenses" }
+						
+						(Get-Date -Format s)+"|"+$UserPrincipalName+" was already licensed."  | Out-File $LogFile -Append -Force
+						#Remove Message from Windows Azure Queue
+						Remove-QueueMessage -Credentials $MessageServiceCredential -Queue $QueueName -Id $Message.id -Verbose $Verbose
 					} else {
 						#License User - the mailbox is created automatically
 						if ($Verbose){ Write-Host "Adding licenses to $UserPrincipalName" }
-						Set-MsolUserLicenses -UserPrincipalName $UserPrincipalName
+						Set-MsolUserLicenses -UserPrincipalName $UserPrincipalName	
+						
+						if(Get-MsolUserIsLicensed -UserPrincipalName $UserPrincipalName){
+							(Get-Date -Format s)+"|"+$UserPrincipalName+" licensed successfully."  | Out-File $LogFile -Append -Force
+							#Remove Message from Windows Azure Queue
+							Remove-QueueMessage -Credentials $MessageServiceCredential -Queue $QueueName -Id $Message.id -Verbose $Verbose
+						}
 					}
 					
-					#Remove Message from Windows Azure Queue
-					Remove-QueueMessage -Credentials $MessageServiceCredential -Queue $QueueName -Id $Message.id -Verbose $Verbose
 				} else {
 					if ($Verbose){ Write-Host "$UserPrincipalName does not exist in Windows Azure. Skipping." }
+					(Get-Date -Format s)+"|"+$UserPrincipalName+" does not exist in Windows Azure. Skipping."  | Out-File $LogFile -Append -Force
 				}
 			
 				#Skip all other processing
@@ -234,7 +244,7 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 				#Does this user need an Exchange acount and does one already exist?
 				$CreateExchangeAccount = Get-ExchangeAccountNeeded $Message.messageData.attributes
 				$OnPremExchangeAccount = Get-OnPremMailboxExists $UserPrincipalName
-				$AzureExchangeAccount = Get-AzureMailboxExists $UserPrincipalName
+				#$AzureExchangeAccount = Get-AzureMailboxExists $UserPrincipalName
 				
 				#Update Account
 				if ($Verbose) { Write-Host "Updating $UserPrincipalName" }
@@ -244,7 +254,6 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 					#Update CIMS Groups
 					$CurrentCimsGroups = Get-CurrentCimsGroupList -UserPrincipalName $UserPrincipalName
 					
-					#if (! $CimsGroups.Count -gt 0) { [System.Array] $CimsGroups = $() }
 					if (! $CurrentCimsGroups.Count -gt 0) { [System.Array] $CurrentCimsGroups = $() }
 					
 					if ($Verbose) { Write-Host "Current CIMS groups: $CurrentCimsGroups"}
@@ -271,9 +280,17 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 						if($CreateExchangeAccount){
 							if($Verbose) { Write-Host "Exchange Account required for $UserPrincipalName" }
 							
+							#If NAMS says an Exchange account already exists, don't create another one
+							if ($Message.messageData.attributes.ExchangeAccountExists -and $Message.messageData.attributes.ExchangeAccountExists[0] -eq "Yes"){
+								$ExchangeAccountExists = $true
+							} else {
+								$ExchangeAccountExists = $false
+							}
+							
 							#If the user doesn't already have an Exchange account put it on the Windows Azure queue
-							if ( (! $OnPremExchangeAccount) -and (! $AzureExchangeAccount)) {
+							if ( (! $OnPremExchangeAccount) -and (! $ExchangeAccountExists)) {
 								if($Verbose) { Write-Host "Publishing message to Windows Azure queue" }
+								(Get-Date -Format s)+"|Moving message for "+$UserPrincipalName+" to Office365 queue" | Out-File $LogFile -Append -Force
 								Publish-QueueMessage -Credentials $MessageServiceCredential -Program "edu:usf:cims:PowerShell:ProvisionAccounts" -Queue $AzureQueueName -Data $Message.messageData
 							}
 						} else {
@@ -281,9 +298,11 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 						
 							#If this account already has an Exchange account, disable it
 							if($OnPremExchangeAccount){
-								Disable-OnPremMailboxAccess $UserPrincipalName
-							} elseif($AzureExchangeAccount) {
-								Disable-AzureMailboxAccess $UserPrincipalName
+							#	Disable-OnPremMailboxAccess $UserPrincipalName
+							#	(Get-Date -Format s)+"|"+$UserPrincipalName+" OnPrem Exchange Account Disabled" | Out-File $LogFile -Append -Force
+							#} elseif($AzureExchangeAccount) {
+							#	Disable-AzureMailboxAccess $UserPrincipalName
+							#	(Get-Date -Format s)+"|"+$UserPrincipalName+" Office365 account Disabled" | Out-File $LogFile -Append -Force
 							} else {
 							#User does not have an existing Exchange account
 																				
@@ -381,13 +400,13 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 					
 					# Write a message to the confirmation queue
 					$confirmationData = @{ requestId = $Message.id; requestTime = $Message.createTime; username = $UserPrincipalName; action = $Action}
-					Publish-TopicMessage -Credentials $MessageServiceCredential -Program "edu:usf:cims:PowerShell:ProvisionAccounts" -Topic $ConfirmationTopicName -Data $confirmationData
+					Publish-TopicMessage -Credentials $MessageServiceCredential -Program "edu:usf:cims:PowerShell:ProvisionAccounts" -Topic $ConfirmationTopicName -Data $confirmationData | Out-Null
 				} catch [system.exception] {
 					if ($Verbose) { Write-Host $Error[0].Exception }
 					$Error[0].Exception | Out-File $LogFile -Append -Force
 				}
 			
-				Remove-Variable ChangeType
+				Remove-Variable ChangeType | Out-Null
 			}
 		} else {
 			#"No NetID - Skipping"
@@ -400,7 +419,3 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 		break
 	}
 }
-
-#Cleanup Remote Powershell sessions
-#Remove-PSSession $ExchSession
-#Remove-PSSession $O365Session

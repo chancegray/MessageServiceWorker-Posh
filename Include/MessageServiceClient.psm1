@@ -186,6 +186,25 @@ function Remove-QueueMessage($Credentials, [string] $Queue, [string] $Id, [bool]
 	}
 }
 
+#def response = messageService.put( path: path) { json status: status, apiVersion: 1 }
+
+function Set-QueueMessageStatus($Credentials, [string] $Queue, [string] $Id, [string] $Status, [bool] $Verbose)
+{
+	$headers = Get-HttpBasicHeader $Credentials
+	$uri = "$SCRIPT:baseURI/queue/$Queue/$Id"
+	$bodyData = @{ apiversion = "1"; status = $Status } | ConvertTo-Json -Depth 5
+	try {
+		$ProgressPreference = "SilentlyContinue"
+		$result = Invoke-RestMethod -uri $uri -Headers $headers -ContentType "application/json" -Method "PUT" -Body $bodyData -ErrorVariable a
+		if ($Verbose) { Write-Host "Message $Id updated to status $Status" }
+	} catch [System.Net.WebException] {
+			$QueueFile = Get-QueueFile "UpdateMessageStatus" "queue" $Queue
+			Write-Warning "Failed updating message $Id in queue $Queue to status $Status. Writing data to $QueueFile"
+			Write-Warning $_ | fl * -Force
+			New-Item $QueueFile -type file -value $Id | Out-Null
+	}
+}
+
 Export-ModuleMember -function Get-Topics
 Export-ModuleMember -function Get-TopicMessages
 Export-ModuleMember -function Publish-TopicMessage
@@ -195,10 +214,11 @@ Export-ModuleMember -function Publish-QueueMessage
 Export-ModuleMember -function Remove-QueueMessage
 Export-ModuleMember -function Show-QueueMessage
 Export-ModuleMember -function Get-InProgress
+Export-ModuleMember -Function Set-QueueMessageStatus
 
 
 New-Alias -Name peek -Value Show-QueueMessage
 Export-ModuleMember -Alias peek
 
-New-Alias -Name InProgress -Value Get-QueueMessage 
+New-Alias -Name InProgress -Value Get-InProgress
 Export-ModuleMember -Alias InProgress
