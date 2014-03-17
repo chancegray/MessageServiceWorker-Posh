@@ -35,4 +35,7 @@ while($true){
 	
 	#wait to start next loop
 	Start-Sleep -Milliseconds $SleepTimer
+	
+	#Cleanup old jobs
+	Get-Job -State Completed | Remove-Job
 }

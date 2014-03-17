@@ -3,9 +3,10 @@ $StartupObject = $StartupString.split("|")
 [String]$Action = $StartupObject[0]
 [String]$ScriptPath = $StartupObject[1]
 [String]$LogFile = $StartupObject[2]
+
 <#
 $LogFile = "C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh\Logs\test.log"
-$Action="update"
+$Action="provision"
 $ScriptPath="C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh"
 #>
 
@@ -418,4 +419,11 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 		#We didn't get a message back - end this thread
 		break
 	}
+}
+
+if ( $ExchSession -ne $null ) {
+	Remove-PSSession $ExchSession -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+}
+if ($O365Session -ne $null ) {
+	Remove-PSSession $O365Session -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
 }

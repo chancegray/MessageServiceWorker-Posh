@@ -33,3 +33,6 @@ Remove-Item $ThreadLogFileName
 Start-Job -InitializationScript $InitBlock -FilePath $ResetStatusCommand -InputObject $InputObject  | Out-Null
 
 Get-Job | Wait-Job | Out-Null
+
+#Cleanup old jobs
+Get-Job -State Completed | Remove-Job
