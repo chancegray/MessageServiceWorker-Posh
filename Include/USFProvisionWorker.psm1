@@ -156,8 +156,8 @@ function Resolve-DefaultContainer {
 		}
 	} else {
 		#Some groups don't give an ePPA, so we have to go by USFPA
-		if ($PrimaryAffiliation){
-			switch -regex ($PrimaryAffiliation) {
+		if ($UsfPrimaryAffiliation){
+			switch -regex ($UsfPrimaryAffiliation) {
 				"VIP" {
 					$ParentContainer = $("OU=VIP,OU=NewAccounts,"+$BaseDN)
 					break
@@ -227,8 +227,8 @@ function Get-ExchangeAccountNeeded {
 		}
 	} else {
 	#Some groups don't give an ePPA, so we have to go by USFPA
-		if ($PrimaryAffiliation){
-			switch -regex ($PrimaryAffiliation) {
+		if ($UsfPrimaryAffiliation){
+			switch -regex ($UsfPrimaryAffiliation) {
 				"InEd Instructor" {
 					return $false
 					break
@@ -272,8 +272,8 @@ function Get-HideAddressFromGal {
 		}
 	} else {
 	#Some groups don't give an ePPA, so we have to go by USFPA
-		if ($PrimaryAffiliation){
-			switch -regex ($PrimaryAffiliation) {
+		if ($UsfPrimaryAffiliation){
+			switch -regex ($UsfPrimaryAffiliation) {
 				"InEd Student" {
 					return $false
 					break

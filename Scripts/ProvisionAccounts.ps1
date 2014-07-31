@@ -1,14 +1,13 @@
+<#
 [String]$StartupString = $input
 $StartupObject = $StartupString.split("|")
 [String]$Action = $StartupObject[0]
 [String]$ScriptPath = $StartupObject[1]
 [String]$LogFile = $StartupObject[2]
-
-<#
-$LogFile = "C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh\Logs\test.log"
-$Action="provision"
-$ScriptPath="C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh"
 #>
+$LogFile = "C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh\Logs\test.log"
+$Action="update"
+$ScriptPath="C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh"
 
 Import-Module MSOnline -Force
 Import-Module $ScriptPath\Include\MessageServiceClient.psm1 -Force
@@ -28,6 +27,7 @@ $WindowsCredential = New-Object -TypeName System.Management.Automation.PSCredent
 $AzureCredential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $config["Azure"]["User"],$AzurePassword
 $AesPassphrase = Get-Content $config["MessageService"]["AESpassphraseFile"]
 $UpnDomain = $config["ActiveDirectory"]["UpnDomain"]
+$O365Domain = $config["Azure"]["Office365Domain"]
 $Domain = $config["ActiveDirectory"]["Domain"]
 $BaseDN = $config["ActiveDirectory"]["BaseDN"]
 
@@ -107,6 +107,7 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 				#Multiple NetIDs - Check the primary one first
 				$Username = $Message.messageData.attributes.uid[0]
 				$UserPrincipalName = $($Username+"@"+$UpnDomain)
+				$RemoteMailAddress = $($Username+"@"+$O365Domain)
 				if (Get-UserExists -UserPrincipalName $UserPrincipalName -SearchRoot $BaseDN){
 					if ($Verbose){ Write-Host "Account" $UserPrincipalName "found" }
 					$AccountExists = $true
@@ -120,6 +121,7 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 						}
 						$Username = $uid
 						$UserPrincipalName = $($Username+"@"+$UpnDomain)
+						$RemoteMailAddress = $($Username+"@"+$O365Domain)
 						if (Get-UserExists -UserPrincipalName $UserPrincipalName -SearchRoot $BaseDN){
 							if ($Verbose){ Write-Host "Account" $UserPrincipalName "found" }
 							$AccountExists = $true
@@ -140,6 +142,7 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 							$ChangeType = "create"
 							$Username = $Message.messageData.attributes.uid[0]
 							$UserPrincipalName = $($Username+"@"+$UpnDomain)
+							$RemoteMailAddress = $($Username+"@"+$O365Domain)
 							if ($Verbose){ Write-Host "Creating account for $UserPrincipalName" }
 							(Get-Date -Format s)+"|Creating account for "+$UserPrincipalName+" in "+$ParentContainer | Out-File $LogFile -Append -Force
  
@@ -159,6 +162,7 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 				#Single NetID
 				$Username = $Message.messageData.attributes.uid[0]
 				$UserPrincipalName = $($Username+"@"+$UpnDomain)
+				$RemoteMailAddress = $($Username+"@"+$O365Domain)
 				if (Get-UserExists -UserPrincipalName $UserPrincipalName -SearchRoot $BaseDN){
 					if ($Verbose){ Write-Host "Account $UserPrincipalName found" }
 					$AccountExists = $true
@@ -215,6 +219,10 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 						
 						if(Get-MsolUserIsLicensed -UserPrincipalName $UserPrincipalName){
 							(Get-Date -Format s)+"|"+$UserPrincipalName+" licensed successfully."  | Out-File $LogFile -Append -Force
+							
+							#Adding necessary attributes to local AD
+							Enable-OnPremRemoteMailbox $UserPrincipalName -RemoteRoutingAddress $RemoteMailAddress -ErrorAction SilentlyContinue -WarningAction SilentlyContinue | Out-Null
+							(Get-Date -Format s)+"|Remote mailbox added to AD account "+$UserPrincipalName  | Out-File $LogFile -Append -Force
 							#Remove Message from Windows Azure Queue
 							Remove-QueueMessage -Credentials $MessageServiceCredential -Queue $QueueName -Id $Message.id -Verbose $Verbose
 						}
