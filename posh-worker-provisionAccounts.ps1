@@ -25,9 +25,10 @@ while($true){
 		New-Item -ItemType file -Path $ThreadLogFileName | Out-Null
 	}
 	$InputObject = "provision|"+$ScriptPath+"|"+$ThreadLogFileName 
-    Start-Job -InitializationScript $InitBlock -FilePath $RunCommand -InputObject $InputObject | Out-Null
+    Start-Job -InitializationScript $InitBlock -FilePath $RunCommand -InputObject $InputObject -Name "AccountProvision" | Out-Null
 
-	Get-Job | Wait-Job | Out-Null
+	#Wait for the job to complete, but give up after 5 minutes
+	Get-Job | Wait-Job -Timeout 300 | Out-Null
 
 	#Combine logfile with main one
 	Get-Content $ThreadLogFileName | Add-Content $LogFileName
@@ -37,5 +38,5 @@ while($true){
 	Start-Sleep -Milliseconds $SleepTimer
 	
 	#Cleanup old jobs
-	Get-Job -State Completed | Remove-Job
+	Get-Job -Name "AccountProvision" | Remove-Job
 }
