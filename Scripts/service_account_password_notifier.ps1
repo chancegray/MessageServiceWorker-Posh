@@ -21,7 +21,7 @@ $expired = 0
 $no_requester = 0
 	
 $expireDate = (Get-Date).AddDays($NotifyDays)
-$accounts_to_be_notified = Get-QADUser -Enabled -PasswordNeverExpires:$false -IncludedProperties userprincipalname,PasswordStatus,othermailbox,usfedurequester -SearchAttributes @{usfeduprimaryaffiliation='ServiceAccounts'} | Where {($_.PasswordExpires -lt $expireDate) -and ($_.PasswordStatus -ne "User must change password at next logon.")}
+$accounts_to_be_notified = Get-QADUser -Enabled -PasswordNeverExpires:$false -IncludedProperties userprincipalname,PasswordStatus,othermailbox,usfedurequester -LdapFilter "(|(usfeduprimaryaffiliation='ServiceAccounts')(usfedurequester=*))" | Where {($_.PasswordExpires -lt $expireDate) -and ($_.PasswordStatus -ne "User must change password at next logon.")}
 
 foreach ($account in $accounts_to_be_notified){
 	
