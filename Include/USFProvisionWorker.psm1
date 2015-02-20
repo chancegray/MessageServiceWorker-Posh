@@ -13,7 +13,7 @@ function ConvertTo-AttributeHash {
 	$AttributeHash = @{  	
 		#'middlename' = 'DELETE_ATTRIBUTE';
 		#'Title' = 'DELETE_ATTRIBUTE';
-		#'physicalDeliveryOfficeName' = 'DELETE_ATTRIBUTE';
+		'physicalDeliveryOfficeName' = 'DELETE_ATTRIBUTE';
 		#'givenName' = 'DELETE_ATTRIBUTE';
 		#'sn' = 'DELETE_ATTRIBUTE';
 		#'displayName' = 'DELETE_ATTRIBUTE';
@@ -21,7 +21,7 @@ function ConvertTo-AttributeHash {
 		#'st' = 'DELETE_ATTRIBUTE';
 		#'postalCode' = 'DELETE_ATTRIBUTE';
 		#'streetAddress' = 'DELETE_ATTRIBUTE';
-		#'telephoneNumber' = 'DELETE_ATTRIBUTE';
+		'telephoneNumber' = 'DELETE_ATTRIBUTE';
 		'Company' = 'DELETE_ATTRIBUTE';
 		'Department' = 'DELETE_ATTRIBUTE'; 
 		'Description' = 'DELETE_ATTRIBUTE';
