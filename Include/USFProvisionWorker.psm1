@@ -68,7 +68,7 @@ function ConvertTo-AttributeHash {
 			if($AttributesFromJSON.$key -is [System.Array] -and $AttributesFromJSON.$key.length -eq 1){
 				$NewAttributes.$key = $AttributesFromJSON.$key[0]
 			}else{
-				$NewAttributes.$key = $AttributesFromJSON.$key
+				$NewAttributes.$key = $AttributesFromJSON.$key | sort -Unique
 			}
 		} else {
 			$NewAttributes.$key = $AttributeHash.$key
