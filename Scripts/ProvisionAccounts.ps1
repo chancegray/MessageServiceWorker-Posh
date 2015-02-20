@@ -5,6 +5,19 @@ $StartupObject = $StartupString.split("|")
 [String]$ScriptPath = $StartupObject[1]
 [String]$LogFile = $StartupObject[2]
 #>
+# Ignore certificate errors
+add-type @"
+    using System.Net;
+    using System.Security.Cryptography.X509Certificates;
+    public class TrustAllCertsPolicy : ICertificatePolicy {
+        public bool CheckValidationResult(
+            ServicePoint srvPoint, X509Certificate certificate,
+            WebRequest request, int certificateProblem) {
+            return true;
+        }
+    }
+"@
+[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
 $LogFile = "C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh\Logs\test.log"
 $Action="update"
 $ScriptPath="C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh"
