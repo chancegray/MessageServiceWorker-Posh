@@ -18,9 +18,12 @@ add-type @"
     }
 "@
 [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
+
 $LogFile = "C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh\Logs\test.log"
 $Action="update"
 $ScriptPath="C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh"
+
+#Add-PSSnapin Quest.ActiveRoles.ADManagement
 
 Import-Module MSOnline -Force
 Import-Module $ScriptPath\Include\MessageServiceClient.psm1 -Force
@@ -388,14 +391,23 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 					}
 				
 					# Skip everyone in the Disabled User Accounts OU
-					if ($CurrentParentContainer -eq $("OU=Disabled User Accounts,OU=Colleges and Departments,"+$BaseDN) ) {
+					if ($CurrentParentContainer -eq $("OU=Disabled User Accounts,OU=Colleges and Departments,"+$BaseDN)) {
 						if ($Verbose) { Write-Host "$UserPrincipalName is in $DefaultParentContainer  Skipping." }
 						(Get-Date -Format s)+"|"+$UserPrincipalName+" is in "+$CurrentParentContainer+".  Skipping all modifications." | Out-File $LogFile -Append -Force
 					} else {
+						# Don't modify the description on accounts in the Transition User OU
+						if ($CurrentParentContainer -eq $("OU=Transition User Accounts,OU=Colleges and Departments,"+$BaseDN)) {
+							$AttrList.Remove('description')
+							if ($Verbose) { Write-Host "$UserPrincipalName is in $DefaultParentContainer  Skipping change to description." }
+							(Get-Date -Format s)+"|"+$UserPrincipalName+" is in "+$CurrentParentContainer+".  Skipping change to description." | Out-File $LogFile -Append -Force
+							
+							# Treat this account like it has no affiliation
+							$DefaultParentContainer = $("OU=No Affiliation,"+$BaseDN)
+						}
 						#Should the account be in the 'No Access' group?
 						$NonActiveMember = Confirm-NonActiveMember -UserPrincipalName $UserPrincipalName
 						if( $DefaultParentContainer -eq $("OU=No Affiliation,"+$BaseDN) ) {
-							if (! $NonActiveMember -and $InManagedContainer){
+							if (! $NonActiveMember -and ($InManagedContainer -or ($CurrentParentContainer -eq $("OU=Transition User Accounts,OU=Colleges and Departments,"+$BaseDN)) )) {
 								if ($Verbose) { Write-Host -NoNewline "Adding $UserPrincipalName to Non-Active Group" }
 								Add-NonActiveMember -UserPrincipalName $UserPrincipalName | Out-Null
 								if ($Verbose) { Write-Host "done" }
