@@ -1,10 +1,9 @@
-<#
 [String]$StartupString = $input
 $StartupObject = $StartupString.split("|")
 [String]$Action = $StartupObject[0]
 [String]$ScriptPath = $StartupObject[1]
 [String]$LogFile = $StartupObject[2]
-#>
+
 # Ignore certificate errors
 add-type @"
     using System.Net;
@@ -19,10 +18,11 @@ add-type @"
 "@
 [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
 
+<#
 $LogFile = "C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh\Logs\test.log"
 $Action="update"
 $ScriptPath="C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh"
-
+#>
 #Add-PSSnapin Quest.ActiveRoles.ADManagement
 
 Import-Module MSOnline -Force
@@ -56,14 +56,13 @@ if (! (Get-PSSession -Name "OnPremExchange" -ErrorAction SilentlyContinue -Warni
 	if ($Verbose){ Write-Host "Created OnPremExchange Powershell connection" }
 }
 
-if($Action -eq "azureProvision") {
-	if (! (Get-PSSession -Name "AzureExchange" -ErrorAction SilentlyContinue -WarningAction SilentlyContinue)) {
-		#Connect to Azure Active Directory
-		$O365Session = New-PSSession -Name "AzureExchange" -ConfigurationName Microsoft.Exchange -ConnectionUri https://ps.outlook.com/powershell -Credential $AzureCredential -Authentication Basic -AllowRedirection -WarningAction SilentlyContinue
-		Import-PSSession $O365Session -AllowClobber -WarningAction SilentlyContinue -Prefix "Azure" | Out-Null 
-		Connect-MsolService -Credential $AzureCredential
-		if ($Verbose){ Write-Host "Created AzureExchange Powershell connection" }
-	}
+
+if (! (Get-PSSession -Name "AzureExchange" -ErrorAction SilentlyContinue -WarningAction SilentlyContinue)) {
+	#Connect to Azure Active Directory
+	$O365Session = New-PSSession -Name "AzureExchange" -ConfigurationName Microsoft.Exchange -ConnectionUri https://ps.outlook.com/powershell -Credential $AzureCredential -Authentication Basic -AllowRedirection -WarningAction SilentlyContinue
+	Import-PSSession $O365Session -AllowClobber -WarningAction SilentlyContinue -Prefix "Azure" | Out-Null 
+	Connect-MsolService -Credential $AzureCredential
+	if ($Verbose){ Write-Host "Created AzureExchange Powershell connection" }
 }
 
 #Connect to On-Premises Active Directory
@@ -229,6 +228,16 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 						#Remove Message from Windows Azure Queue
 						Remove-QueueMessage -Credentials $MessageServiceCredential -Queue $QueueName -Id $Message.id -Verbose $Verbose
 					} else {
+						# Add an On-Prem Lync Account
+						if (! (Get-PSSession -Name "OnPremLync" -ErrorAction SilentlyContinue -WarningAction SilentlyContinue)) {
+							#Connect to On-Premise Lync Server
+							$LyncSession = New-PSSession -Name "OnPremLync" -ConnectionUri $config["ActiveDirectory"]["LyncPowerShellURI"] -Credential $WindowsCredential
+							Import-PSSession $LyncSession -AllowClobber -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Out-Null
+							if ($Verbose){ Write-Host "Created OnPremLync Powershell connection" }
+						}
+						Enable-CsUser -Identity $UserPrincipalName -RegistrarPool $config["ActiveDirectory"]["LyncPoolHost"] -SipAddressType UserPrincipalName -ErrorAction SilentlyContinue -WarningAction SilentlyContinue | Out-Null
+						(Get-Date -Format s)+"|Lync Account added for "+$UserPrincipalName  | Out-File $LogFile -Append -Force
+						
 						#License User - the mailbox is created automatically
 						if ($Verbose){ Write-Host "Adding licenses to $UserPrincipalName" }
 						Set-MsolUserLicenses -UserPrincipalName $UserPrincipalName	
@@ -269,7 +278,7 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 				#Does this user need an Exchange acount and does one already exist?
 				$CreateExchangeAccount = Get-ExchangeAccountNeeded $Message.messageData.attributes
 				$OnPremExchangeAccount = Get-OnPremMailboxExists $UserPrincipalName
-				#$AzureExchangeAccount = Get-AzureMailboxExists $UserPrincipalName
+				$AzureExchangeAccount = Get-AzureMailboxExists $UserPrincipalName
 				
 				#Update Account
 				if ($Verbose) { Write-Host "Updating $UserPrincipalName" }
@@ -292,7 +301,7 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 					$InManagedContainer = Confirm-ManagedContainer -Container $CurrentParentContainer
 		
 					if($InManagedContainer){				
-						if ($Verbose) { Write-Host "$UserPrincipalName is in a managed OU" }
+						if ($Verbose) { Write-Host "$UserPrincipalName is in a managed OU: "$CurrentParentContainer }
 						#Make sure the account is enabled and doesn't have any special uAC flags
 						if( $CurrentAccount.userAccountControl -ne '512' ){
 							if ($Verbose) { Write-Host "Updating $UserPrincipalName to be a regular account" }
@@ -381,6 +390,15 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 						$DefaultParentContainer = Resolve-DefaultContainer -AttributesFromJSON $Message.messageData.attributes -BaseDN $BaseDN
 					
 						if( $DefaultParentContainer -ne $CurrentParentContainer ) {
+							# This user is no longer affiliated and has an Exchange account, so move them to the 'transition' OU
+							if (($DefaultParentContainer -eq $("OU=No Affiliation,"+$BaseDN) ) -and ($AzureExchangeAccount -or $OnPremExchangeAccount)) {
+								$DefaultParentContainer = $("OU=Transition User Accounts,OU=Colleges and Departments,"+$BaseDN)
+								
+								# Update the description to identify when the account was moved
+								$description = $($CurrentAccount.description+" (moved automatically: "+$(Get-Date -Format s)+")") 
+								(Get-Date -Format s)+"|Setting description for "+$UserPrincipalName+" to: "+$description | Out-File $LogFile -Append -Force
+								Set-QADUser -Identity $UserPrincipalName -Description $description | Out-Null
+							}
 							if ($Verbose) { Write-Host -NoNewline "Moving $UserPrincipalName from $CurrentParentContainer to $DefaultParentContainer" }
 							# Output info
 							(Get-Date -Format s)+"|"+$UserPrincipalName+" is in "+$CurrentParentContainer+".  Moving it to "+$DefaultParentContainer | Out-File $LogFile -Append -Force

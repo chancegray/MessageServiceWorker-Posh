@@ -43,7 +43,7 @@ for($counter = 1; $counter -le $MaxThreads; $counter++){
 
 #Remove old temp files
 $DateTime = ((Get-Date).AddMinutes(-30))
-Get-ChildItem -Path $env:TEMP -Recurse -Force -File | Where-Object { $_.LastWriteTime -lt $DateTime } | Remove-Item -Force
+Get-ChildItem -Path $env:TEMP -Recurse -Force -File | Where-Object { $_.LastWriteTime -lt $DateTime } | Remove-Item -Force -ErrorAction SilentlyContinue
 
 Get-ChildItem -Path $env:TEMP -Recurse -Force -Directory | Where-Object { (Get-ChildItem -Path $_.FullName -Recurse -Force -File) -eq $null } | 
     Where-Object { $_.CreationTime -lt $DateTime -and $_.LastWriteTime -lt $DateTime } | Remove-Item -Force -Recurse

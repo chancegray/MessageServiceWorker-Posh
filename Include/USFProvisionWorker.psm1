@@ -128,25 +128,8 @@ function Resolve-DefaultContainer {
 	if ($PrimaryAffiliation){
 		#Check based on ePPA
 		switch -regex ($PrimaryAffiliation) {
-			"Student" {
-				$ParentContainer = $("OU=Accounts,OU=Students,"+$BaseDN)
-				break
-			}
-			"(Faculty|Staff)" {		
-				#USF Health accounts go in their own OU
-				if($AttributesFromJSON.USFeduCollege -and $AttributesFromJSON.USFeduCollege[0] -match "(Medicine|Public Health|Nursing|Pharmacy)"){
-					$ParentContainer = $("OU=USF Health,"+$BaseDN)
-				#So do USFSP
-				} elseif ($AttributesFromJSON.USFeduCampus -and $AttributesFromJSON.USFeduCampus[0] -eq "StPete") {
-					$ParentContainer = $("OU=USF St Pete,"+$BaseDN)
-				#Everyone else goes in NewAccounts
-				} else {
-					$ParentContainer = $("OU=NewAccounts,"+$BaseDN)
-				}
-				break
-			}
-			"Affiliate" {
-				$ParentContainer = $("OU=VIP,OU=NewAccounts,"+$BaseDN)
+			"(Student|Faculty|Staff|Affiliate)" {
+				$ParentContainer = $("OU=Affiliated,"+$BaseDN)
 				break
 			}
 			default {
@@ -158,16 +141,8 @@ function Resolve-DefaultContainer {
 		#Some groups don't give an ePPA, so we have to go by USFPA
 		if ($UsfPrimaryAffiliation){
 			switch -regex ($UsfPrimaryAffiliation) {
-				"VIP" {
-					$ParentContainer = $("OU=VIP,OU=NewAccounts,"+$BaseDN)
-					break
-				}
-				"InEd Instructor" {
-					$ParentContainer = $("OU=NewAccounts,"+$BaseDN)
-					break
-				}
-				"InEd Student" {
-					$ParentContainer = $("OU=Accounts,OU=Students,"+$BaseDN)
+				"(VIP|InEd Instructor|InEd Student)" {
+					$ParentContainer = $("OU=Affiliated,"+$BaseDN)
 					break
 				}
 				default {
@@ -296,8 +271,9 @@ function Confirm-ManagedContainer {
         [Parameter(Position=0, Mandatory=$true,ValueFromPipeline = $true)] $Container
     )
 	
-		#List of managed OUs
+		#List of managed OUs - If an account is in an OU on this list, they will be deprovisioned automatically
 		$ManagedContainers = @(
+			$("OU=Affiliated,"+$BaseDN),
 			$("OU=No Affiliation,"+$BaseDN),
 			$("OU=NewAccounts,"+$BaseDN),
 			$("OU=VIP,OU=NewAccounts,"+$BaseDN),
@@ -305,7 +281,7 @@ function Confirm-ManagedContainer {
 			$("OU=USF St Pete,"+$BaseDN),
 			$("OU=USF Health,"+$BaseDN),
 			$("OU=Accounts,OU=Students,"+$BaseDN),
-			$("OU=Disabled,OU=Students,"+$BaseDN)
+			$("OU=Disabled,OU=Students,"+$BaseDN)			
 		)
 
 		return $ManagedContainers -contains $Container
@@ -314,8 +290,7 @@ function Confirm-ManagedContainer {
 function Confirm-ContactNeeded {
 	param(
         [Parameter(Position=0, Mandatory=$true,ValueFromPipeline = $true)] $EmailAddress
-    )
-	
+    )	
 		#List of domains we create contacts for
 		$ContactDomains = @(
 			$(".*@mail\.usf\.edu"),
