@@ -7,7 +7,8 @@
 
 function ConvertTo-AttributeHash {
     param(
-        [Parameter(Position=0, Mandatory=$true,ValueFromPipeline = $true)] $AttributesFromJSON
+        [Parameter(Position=0, Mandatory=$true,ValueFromPipeline = $true)] $AttributesFromJSON,
+		[Parameter(Mandatory=$true)] [System.String] $UpnDomain
     )
 	
 	$AttributeHash = @{  	
@@ -98,6 +99,7 @@ function ConvertTo-AttributeHash {
 	
 	if($AttributesFromJSON.uid) {
 		$NewAttributes.SamAccountName = $AttributesFromJSON.uid[0]
+		$NewAttributes.UserPrincipalName = $AttributesFromJSON.uid[0] + '@' + $UpnDomain
 		if($AttributesFromJSON.uid.length -eq 1){
 			$NewAttributes.USFeduNetID = $AttributesFromJSON.uid[0]
 		}else{

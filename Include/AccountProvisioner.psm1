@@ -504,6 +504,8 @@ function Set-Account {
 		[Parameter(Mandatory=$true)] [hashtable]$Attributes
     )	
 	
+	$GUID = (Get-QADUser -Identity $UserPrincipalName).guid
+	
 	#Update CommonName
 	if($Attributes.SamAccountName -or $Attributes.givenName -or $Attributes.sn -or $Attributes.cn){
 		if ($Attributes.cn){
@@ -513,11 +515,19 @@ function Set-Account {
 			$NewCommonName = $Attributes.sn + ', ' + $Attributes.givenName + ' [' + $Attributes.SamAccountName + ']'
 		}
 		Write-LogEntry 1 Information "Set-Account: Updating CommonName on $UserPrincipalName to $NewCommonName"
-		Rename-QADObject -Identity $UserPrincipalName -NewName $NewCommonName
+		Rename-QADObject -Identity $GUID -NewName $NewCommonName
+		
 	}
+	
+	if($Attributes.UserPrincipalName){
+		$UserPrincipalName = $Attributes.UserPrincipalName
+	}
+	
 	$num = $Attributes.Keys | Measure-Object | Select-Object -expand count
 	Write-LogEntry 1 Information "Set-Account: Updating $num attributes on $UserPrincipalName"
 	Set-QADUser -Identity $UserPrincipalName -ObjectAttributes $Attributes | Out-Null
+	
+	return $UserPrincipalName
 }
 
 function Move-Account {

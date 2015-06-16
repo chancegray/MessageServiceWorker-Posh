@@ -270,7 +270,7 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 
 			if($SkipProcessing -ne $true){
 				#Get a HashMap of attributes
-				$NewAttributes = ConvertTo-AttributeHash -AttributesFromJSON $Message.messageData.attributes
+				$NewAttributes = ConvertTo-AttributeHash -AttributesFromJSON $Message.messageData.attributes -UpnDomain $UpnDomain
 			
 				$AttrList = Get-AttributesToModify -UserPrincipalName $UserPrincipalName -Attributes $NewAttributes
 				if ($Verbose){ $AttrList | Format-List } 
@@ -283,7 +283,7 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 				#Update Account
 				if ($Verbose) { Write-Host "Updating $UserPrincipalName" }
 				try {
-					$CurrentAccount = Get-QADUser -UserPrincipalName $UserPrincipalName -IncludedProperties userAccountControl
+					$CurrentAccount = Get-QADUser -Identity $UserPrincipalName -IncludedProperties userAccountControl
 					
 					#Update CIMS Groups
 					$CurrentCimsGroups = Get-CurrentCimsGroupList -UserPrincipalName $UserPrincipalName
@@ -293,8 +293,11 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 					if ($Verbose) { Write-Host "Current CIMS groups: $CurrentCimsGroups"}
 					
 					$Results = Set-CimsGroups -UserPrincipalName $UserPrincipalName -NewCimsGroups $Message.messageData.attributes.CimsGroups
+				
 					(Get-Date -Format s)+"|"+$UserPrincipalName+" "+$Results | Out-File $LogFile -Append -Force
 					if ($Verbose) { Write-Host $Results }
+					
+										
 					
 					#Is this account in a managed OU?
 					$CurrentParentContainer = $CurrentAccount.ParentContainerDN.ToString()
