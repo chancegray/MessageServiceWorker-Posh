@@ -297,7 +297,9 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 					(Get-Date -Format s)+"|"+$UserPrincipalName+" "+$Results | Out-File $LogFile -Append -Force
 					if ($Verbose) { Write-Host $Results }
 					
-										
+					# Set the correct uAC flags
+					Get-ADUser -Filter {userprincipalname -eq $UserPrincipalName} | Set-ADAccountControl -CannotChangePassword $true -PasswordNeverExpires $false -PasswordNotRequired $false | out-null
+                                        (Get-Date -Format s)+"|"+$UserPrincipalName+" account uAC updated" | Out-File $LogFile -Append -Force	
 					
 					#Is this account in a managed OU?
 					$CurrentParentContainer = $CurrentAccount.ParentContainerDN.ToString()
@@ -309,7 +311,7 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 						if( $CurrentAccount.userAccountControl -ne '512' ){
 							if ($Verbose) { Write-Host "Updating $UserPrincipalName to be a regular account" }
 							Set-QADUser -Identity $UserPrincipalName -ObjectAttributes @{userAccountControl=512} | Out-Null
-							(Get-Date -Format s)+"|"+$UserPrincipalName+" uAC updated" | Out-File $LogFile -Append -Force
+							(Get-Date -Format s)+"|"+$UserPrincipalName+" account enabled" | Out-File $LogFile -Append -Force
 							$Enabled++
 						}
 				
