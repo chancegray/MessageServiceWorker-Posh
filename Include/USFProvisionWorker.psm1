@@ -143,7 +143,7 @@ function Resolve-DefaultContainer {
 		#Some groups don't give an ePPA, so we have to go by USFPA
 		if ($UsfPrimaryAffiliation){
 			switch -regex ($UsfPrimaryAffiliation) {
-				"(VIP|InEd Instructor|InEd Student)" {
+				"(VIP|InEd Instructor|InEd Student|Provost-extended-faculty|Physicians Group|Sponsored Health Guest|NonEmployee)" {
 					$ParentContainer = $("OU=Affiliated,"+$BaseDN)
 					break
 				}
