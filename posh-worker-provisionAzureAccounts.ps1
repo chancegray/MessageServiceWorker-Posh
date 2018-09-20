@@ -1,4 +1,4 @@
-$ScriptPath = "C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh"
+$ScriptPath = "D:\Provisioning\MessageServiceWorker-Posh"
 
 $LogDir = $ScriptPath+"\Logs"
 $LogFileName = $LogDir+"\provision-azure.log"
@@ -20,7 +20,7 @@ $ThreadLogFileName = $LogFileName + ".tmp"
 if(! [IO.File]::Exists($ThreadLogFileName)){
 	New-Item -ItemType file -Path $ThreadLogFileName | Out-Null
 }
-$InputObject = "azureProvision|"+$ScriptPath+"|"+$ThreadLogFileName 
+$InputObject = "azureProvision|" + $ScriptPath + "|" + $ThreadLogFileName 
 Start-Job -InitializationScript $InitBlock -FilePath $RunCommand -InputObject $InputObject -Name "AzureProvision" | Out-Null
 
 Get-Job | Wait-Job | Out-Null

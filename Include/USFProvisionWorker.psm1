@@ -112,8 +112,12 @@ function ConvertTo-AttributeHash {
 	}
 	
 	if($AttributesFromJSON.sn -and $AttributesFromJSON.givenName -and $AttributesFromJSON.uid){
+        $NewAttributes.sn = $AttributesFromJSON.sn[0]
+        $NewAttributes.givenName = $AttributesFromJSON.givenName[0]
 		$NewAttributes.cn = $AttributesFromJSON.sn[0] + ', ' + $AttributesFromJSON.givenName[0] + ' [' + $AttributesFromJSON.uid[0] + ']'
+        $NewAttributes.displayName = $AttributesFromJSON.sn[0] + ', ' + $AttributesFromJSON.givenName[0]
 	}
+
 	
 	return $NewAttributes
 }

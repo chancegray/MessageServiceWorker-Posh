@@ -1,4 +1,6 @@
-$ScriptPath="C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh"
+$ScriptPath="D:\Provisioning\MessageServiceWorker-Posh"
+
+Add-PSSnapin Quest.ActiveRoles.ADManagement
 
 Import-Module $ScriptPath\Include\MessageServiceClient.psm1 -Force
 Import-Module $ScriptPath\Include\Import-INI.psm1 -Force
@@ -81,7 +83,7 @@ Only the requester can change the password, if the requester is not available, p
 		$no_requester += 1
 	}
 	
-	Send-MailMessage -SmtpServer $NotifyMailHost -From $NotifyFrom -To $requester_email -Subject $subject -Body $requester_body
+    Send-MailMessage -SmtpServer $NotifyMailHost -From $NotifyFrom -To $requester_email -Subject $subject -Body $requester_body
 	
 	if( $notify_list -is [system.array] ){
 		foreach ($address in $notify_list) {

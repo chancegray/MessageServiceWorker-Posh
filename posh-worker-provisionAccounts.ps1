@@ -1,6 +1,6 @@
 #Sleep 2 seconds between runs
 $SleepTimer = 2000
-$ScriptPath = "C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh"
+$ScriptPath = "D:\Provisioning\MessageServiceWorker-Posh"
 
 $LogDir = $ScriptPath+"\Logs"
 $LogFileName = $LogDir+"\provision-accounts.log"

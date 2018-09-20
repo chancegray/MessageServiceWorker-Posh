@@ -1,6 +1,6 @@
 $MaxThreads = 10
 $SleepTimer = 50
-$ScriptPath = "C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh"
+$ScriptPath = "D:\Provisioning\MessageServiceWorker-Posh"
 
 $LogDir = $ScriptPath+"\Logs"
 $LogFileName = $LogDir+"\update-accounts.log"

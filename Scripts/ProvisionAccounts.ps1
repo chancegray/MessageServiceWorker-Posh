@@ -19,12 +19,13 @@ add-type @"
 [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
 
 <#
-$LogFile = "C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh\Logs\test.log"
-$Action="update"
-$ScriptPath="C:\Users\epierce\Documents\GitHub\MessageServiceWorker-Posh"
+$LogFile = "D:\Provisioning\MessageServiceWorker-Posh\Logs\test.log"
+$Action="provision"
+$ScriptPath="D:\Provisioning\MessageServiceWorker-Posh"
+Add-PSSnapin Quest.ActiveRoles.ADManagement
 #>
-#Add-PSSnapin Quest.ActiveRoles.ADManagement
 
+Import-Module ActiveDirectory
 Import-Module MSOnline -Force
 Import-Module $ScriptPath\Include\MessageServiceClient.psm1 -Force
 Import-Module $ScriptPath\Include\Import-INI.psm1 -Force
@@ -224,23 +225,24 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 						$Licenses = Get-MsolUserLicenses -UserPrincipalName $UserPrincipalName
 						if ($Verbose){ Write-Host "$UserPrincipalName has these licenses: $Licenses" }
 						
-						(Get-Date -Format s)+"|"+$UserPrincipalName+" was already licensed."  | Out-File $LogFile -Append -Force
+						(Get-Date -Format s)+"|"+$UserPrincipalName+" was already licensed:"+$Licenses | Out-File $LogFile -Append -Force
 						#Remove Message from Windows Azure Queue
 						Remove-QueueMessage -Credentials $MessageServiceCredential -Queue $QueueName -Id $Message.id -Verbose $Verbose
 					} else {
 						# Add an On-Prem Lync Account
-						if (! (Get-PSSession -Name "OnPremLync" -ErrorAction SilentlyContinue -WarningAction SilentlyContinue)) {
+						#if (! (Get-PSSession -Name "OnPremLync" -ErrorAction SilentlyContinue -WarningAction SilentlyContinue)) {
 							#Connect to On-Premise Lync Server
-							$LyncSession = New-PSSession -Name "OnPremLync" -ConnectionUri $config["ActiveDirectory"]["LyncPowerShellURI"] -Credential $WindowsCredential
-							Import-PSSession $LyncSession -AllowClobber -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Out-Null
-							if ($Verbose){ Write-Host "Created OnPremLync Powershell connection" }
-						}
-						Enable-CsUser -Identity $UserPrincipalName -RegistrarPool $config["ActiveDirectory"]["LyncPoolHost"] -SipAddressType UserPrincipalName -ErrorAction SilentlyContinue -WarningAction SilentlyContinue | Out-Null
-						(Get-Date -Format s)+"|Lync Account added for "+$UserPrincipalName  | Out-File $LogFile -Append -Force
+							#$LyncSession = New-PSSession -Name "OnPremLync" -ConnectionUri $config["ActiveDirectory"]["LyncPowerShellURI"] -Credential $WindowsCredential
+							#Import-PSSession $LyncSession -AllowClobber -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Out-Null
+							#if ($Verbose){ Write-Host "Created OnPremLync Powershell connection" }
+						#}
+						#Enable-CsUser -Identity $UserPrincipalName -RegistrarPool $config["ActiveDirectory"]["LyncPoolHost"] -SipAddressType UserPrincipalName -ErrorAction SilentlyContinue -WarningAction SilentlyContinue | Out-Null
+						#(Get-Date -Format s)+"|Lync Account added for "+$UserPrincipalName  | Out-File $LogFile -Append -Force
 						
 						#License User - the mailbox is created automatically
 						if ($Verbose){ Write-Host "Adding licenses to $UserPrincipalName" }
-						Set-MsolUserLicenses -UserPrincipalName $UserPrincipalName	
+						$licenseError = Set-MsolUserLicenses -UserPrincipalName $UserPrincipalName	
+                        (Get-Date -Format s)+"|"+$UserPrincipalName+" license errors: "+$licenseError  | Out-File $LogFile -Append -Force
 						
 						if(Get-MsolUserIsLicensed -UserPrincipalName $UserPrincipalName){
 							(Get-Date -Format s)+"|"+$UserPrincipalName+" licensed successfully."  | Out-File $LogFile -Append -Force
@@ -297,9 +299,9 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 					(Get-Date -Format s)+"|"+$UserPrincipalName+" "+$Results | Out-File $LogFile -Append -Force
 					if ($Verbose) { Write-Host $Results }
 					
-					# Set the correct uAC flags
+                    # Set the correct uAC flags
 					Get-ADUser -Filter {userprincipalname -eq $UserPrincipalName} | Set-ADAccountControl -CannotChangePassword $true -PasswordNeverExpires $false -PasswordNotRequired $false | out-null
-                                        (Get-Date -Format s)+"|"+$UserPrincipalName+" account uAC updated" | Out-File $LogFile -Append -Force	
+                    (Get-Date -Format s)+"|"+$UserPrincipalName+" account uAC updated" | Out-File $LogFile -Append -Force
 					
 					#Is this account in a managed OU?
 					$CurrentParentContainer = $CurrentAccount.ParentContainerDN.ToString()
@@ -307,7 +309,7 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 		
 					if($InManagedContainer){				
 						if ($Verbose) { Write-Host "$UserPrincipalName is in a managed OU: "$CurrentParentContainer }
-						#Make sure the account is enabled and doesn't have any special uAC flags
+						#Make sure the account is enabled
 						if( $CurrentAccount.userAccountControl -ne '512' ){
 							if ($Verbose) { Write-Host "Updating $UserPrincipalName to be a regular account" }
 							Set-QADUser -Identity $UserPrincipalName -ObjectAttributes @{userAccountControl=512} | Out-Null
@@ -400,8 +402,12 @@ for($counter = 1; $counter -le $MaxMessages; $counter++){
 								$DefaultParentContainer = $("OU=Transition User Accounts,OU=Colleges and Departments,"+$BaseDN)
 								
 								# Update the description to identify when the account was moved
-								$description = $($CurrentAccount.description+" (moved automatically: "+$(Get-Date -Format s)+")") 
-								(Get-Date -Format s)+"|Setting description for "+$UserPrincipalName+" to: "+$description | Out-File $LogFile -Append -Force
+                                if ($CurrentAccount.description -ne $null) {
+								    $description = $($CurrentAccount.description+" (Moved automatically: "+$(Get-Date -Format s)+")") 
+								} else {
+                                    $description = "Moved automatically: "+$(Get-Date -Format s)
+                                }
+                                (Get-Date -Format s)+"|Setting description for "+$UserPrincipalName+" to: "+$description | Out-File $LogFile -Append -Force
 								Set-QADUser -Identity $UserPrincipalName -Description $description | Out-Null
 							}
 							if ($Verbose) { Write-Host -NoNewline "Moving $UserPrincipalName from $CurrentParentContainer to $DefaultParentContainer" }

@@ -294,15 +294,25 @@ function Set-MsolUserLicenses {
         [Parameter(Mandatory=$true)] [System.String]$UserPrincipalName
     )
 
+    $err=@()
+
 	#Usage location must be 'US'
-	Set-MsolUser -UserPrincipalName $UserPrincipalName -UsageLocation US
-	
-	$ExchangeLicenseOptions = New-MsolLicenseOptions -AccountSkuId usfedu:STANDARDWOFFPACK_FACULTY -DisabledPlans MCOSTANDARD,SHAREPOINTSTANDARD_EDU
-	$PROJECTONLINE_PLAN_1_FACULTY = New-MsolLicenseOptions -AccountSkuId usfedu:PROJECTONLINE_PLAN_1_FACULTY -DisabledPlans SHAREPOINTWAC_EDU,SHAREPOINT_PROJECT_EDU
-	
-	Set-MsolUserLicense -UserPrincipalName $UserPrincipalName -AddLicenses usfedu:STANDARDWOFFPACK_FACULTY -LicenseOptions $ExchangeLicenseOptions -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Out-Null
-	Set-MsolUserLicense -UserPrincipalName $UserPrincipalName -AddLicenses usfedu:PROJECTONLINE_PLAN_1_FACULTY -LicenseOptions $PROJECTONLINE_PLAN_1_FACULTY -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Out-Null
-	
+	Set-MsolUser -UserPrincipalName $UserPrincipalName -UsageLocation US -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -ErrorVariable +err -WarningVariable +err
+
+    #Remove the student license if it is already there
+    $GetStu = Get-MsolUser -UserPrincipalName $UserPrincipalName -WarningAction SilentlyContinue -ErrorAction SilentlyContinue | Where-Object {$_.IsLicensed -eq $true}
+    if ($GetStu.licenses.accountskuid -eq "usfedu:STANDARDWOFFPACK_IW_STUDENT") { 
+		Set-MsolUserLicense -UserPrincipalName $UserPrincipalName -RemoveLicenses "usfedu:STANDARDWOFFPACK_IW_STUDENT" -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -ErrorVariable +err -WarningVariable +err
+	}
+
+    ### Set O365 licensing
+    $STANDARDWOFFPACK_IW_FACULTY = New-MsolLicenseOptions -AccountSkuId usfedu:STANDARDWOFFPACK_IW_FACULTY -DisabledPlans SHAREPOINTSTANDARD_EDU
+    $PROJECTONLINE_PLAN_1_FACULTY = New-MsolLicenseOptions -AccountSkuId usfedu:PROJECTONLINE_PLAN_1_FACULTY -DisabledPlans SHAREPOINTWAC_EDU
+
+    Set-MsolUserLicense -UserPrincipalName $UserPrincipalName -LicenseOptions $PROJECTONLINE_PLAN_1_FACULTY -AddLicenses usfedu:PROJECTONLINE_PLAN_1_FACULTY -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -ErrorVariable +err -WarningVariable +err | Out-Null
+    Set-MsolUserLicense -UserPrincipalName $UserPrincipalName -LicenseOptions $STANDARDWOFFPACK_IW_FACULTY -AddLicenses usfedu:STANDARDWOFFPACK_IW_FACULTY -WarningAction SilentlyContinue -ErrorAction SilentlyContinue -ErrorVariable +err -WarningVariable +err | Out-Null
+
+    return $err
 }
 
 <#Requires a PowerShell session with the Windows Azure server #>
@@ -493,6 +503,14 @@ function Get-AttributesToModify {
 	}
 
 	$AttributesToModify = Compare-Attributes -CurrentAttributes $CurrentAttributes -NewAttributes $Attributes
+
+    # Make sure the attributes needed for CN changes are available
+    if($AttributesToModify.SamAccountName -or $AttributesToModify.givenName -or $AttributesToModify.sn -or $AttributesToModify.cn){
+        $AttributesToModify.SamAccountName = $Attributes.SamAccountName
+        $AttributesToModify.givenName = $Attributes.givenName
+        $AttributesToModify.sn = $Attributes.sn
+        $AttributesToModify.displayName = $Attributes.sn + ', ' + $Attributes.givenName
+     }
 	
 	return $AttributesToModify	
 }
@@ -516,7 +534,6 @@ function Set-Account {
 		}
 		Write-LogEntry 1 Information "Set-Account: Updating CommonName on $UserPrincipalName to $NewCommonName"
 		Rename-QADObject -Identity $GUID -NewName $NewCommonName
-		
 	}
 	
 	if($Attributes.UserPrincipalName){
@@ -525,7 +542,7 @@ function Set-Account {
 	
 	$num = $Attributes.Keys | Measure-Object | Select-Object -expand count
 	Write-LogEntry 1 Information "Set-Account: Updating $num attributes on $UserPrincipalName"
-	Set-QADUser -Identity $UserPrincipalName -ObjectAttributes $Attributes | Out-Null
+	Set-QADUser -Identity $GUID -ObjectAttributes $Attributes | Out-Null
 	
 	return $UserPrincipalName
 }
